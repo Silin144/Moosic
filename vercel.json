@@ -1,14 +1,8 @@
 {
   "version": 2,
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "dist",
   "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/node",
-      "config": {
-        "buildCommand": "npm run build",
-        "outputDirectory": "dist"
-      }
-    },
     {
       "src": "server.py",
       "use": "@vercel/python@3.1.0"
@@ -20,12 +14,11 @@
       "dest": "/server.py"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "/dist/assets/$1"
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/dist/$1"
+      "dest": "/index.html"
     }
   ]
 }

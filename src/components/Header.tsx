@@ -9,7 +9,7 @@ interface User {
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null)
-  const navigate = useNavigate()
+  const navigate = useNavigate() // Used in handleLogout
 
   useEffect(() => {
     fetch('/api/me')
