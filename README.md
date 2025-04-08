@@ -1,4 +1,4 @@
-# MakeMeAPlaylist
+# Moosic - AI-Powered Spotify Playlist Generator
 
 A web application that creates personalized Spotify playlists using AI. The app combines GPT-4's music knowledge with Spotify's recommendation engine to create the perfect playlist based on your mood and genre preferences.
 
@@ -18,12 +18,12 @@ A web application that creates personalized Spotify playlists using AI. The app 
 - A Spotify Developer account
 - An OpenAI API key
 
-## Setup
+## Local Development Setup
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/makemeaplaylist.git
-cd makemeaplaylist
+git clone https://github.com/Silin144/Moosic.git
+cd Moosic
 ```
 
 2. Install frontend dependencies:
@@ -47,41 +47,89 @@ cp .env.example .env
 - Get Spotify credentials from [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 - Get OpenAI API key from [OpenAI Platform](https://platform.openai.com/account/api-keys)
 
-## Development
+## Running the Application
 
-Start the development servers:
+You can run the frontend and backend separately:
+
+### Frontend Only
 ```bash
+# In one terminal
+./start-frontend.sh
+```
+Frontend will run at http://localhost:5173
+
+### Backend Only
+```bash
+# In another terminal
+./start-backend.sh
+```
+Backend will run at http://localhost:3001
+
+### Both Services
+```bash
+# Run both services together
 ./start.sh
 ```
 
-This will start:
-- Frontend at http://localhost:5173
-- Backend at http://localhost:3001
-
 ## Production Deployment
 
-1. Build the frontend:
+### Frontend Deployment (Vercel)
+
+1. Push your code to GitHub
+2. Connect your repository to Vercel
+3. Set environment variables in Vercel:
+```
+VITE_API_URL=https://your-backend-domain.com
+```
+4. Deploy with Vercel CLI:
 ```bash
-npm run build
+npm install -g vercel
+vercel
 ```
 
-2. Set up your production environment variables:
-```bash
-SPOTIFY_REDIRECT_URI=https://your-domain.com/api/callback
-FRONTEND_URL=https://your-domain.com
+### Backend Deployment (Heroku)
+
+1. Create Procfile:
+```
+web: gunicorn server:app
 ```
 
-3. Deploy the backend:
-- Use a production WSGI server (e.g., Gunicorn)
-- Set up HTTPS
-- Configure your web server (e.g., Nginx)
-
-Example Gunicorn command:
+2. Install production dependencies:
 ```bash
-gunicorn server:app -b 0.0.0.0:$PORT
+pip install gunicorn
+pip freeze > requirements.txt
 ```
 
-4. Deploy the frontend build directory to your static hosting service
+3. Create Heroku app and deploy:
+```bash
+heroku create your-app-name
+heroku git:remote -a your-app-name
+git push heroku main
+```
+
+4. Set environment variables in Heroku:
+```bash
+heroku config:set SPOTIFY_CLIENT_ID=your_id
+heroku config:set SPOTIFY_CLIENT_SECRET=your_secret
+heroku config:set SPOTIFY_REDIRECT_URI=https://your-frontend-domain.com/api/callback
+heroku config:set OPENAI_API_KEY=your_key
+heroku config:set FRONTEND_URL=https://your-frontend-domain.com
+```
+
+### Important Deployment Steps
+
+1. Update Spotify Developer Dashboard:
+   - Add your production redirect URI
+   - Update allowed origins
+
+2. Update CORS settings in server.py:
+   - Add your production frontend URL
+   - Remove development URLs in production
+
+3. Test the deployment:
+   - Verify frontend can connect to backend
+   - Test Spotify authentication flow
+   - Ensure playlist creation works
 
 ## Tech Stack
 
