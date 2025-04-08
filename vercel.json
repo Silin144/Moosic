@@ -1,34 +1,25 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "buildCommand": "npm run build",
-        "outputDirectory": "dist"
-      }
-    },
-    {
-      "src": "server.py",
-      "use": "@vercel/python",
-      "config": {
-        "runtime": "python3.9",
-        "maxLambdaSize": "15mb"
-      }
+  "buildCommand": "chmod +x vercel-build.sh && ./vercel-build.sh",
+  "outputDirectory": ".vercel/output/static",
+  "functions": {
+    "api/**": {
+      "runtime": "python3.9",
+      "memory": 1024,
+      "maxDuration": 10
     }
-  ],
+  },
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/server.py"
+      "dest": "/.vercel/output/functions/server.py"
     },
     {
       "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/dist/$1"
+      "dest": "/$1"
     }
   ]
 }
