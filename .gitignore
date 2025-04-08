@@ -46,3 +46,11 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# AWS Elastic Beanstalk
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
+
+# Cache
+.cache/

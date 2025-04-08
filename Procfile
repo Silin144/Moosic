@@ -1,1 +1,1 @@
-web: gunicorn server:app
+web: gunicorn --workers=2 --threads=4 --worker-class=gthread --bind=:5000 server:app
