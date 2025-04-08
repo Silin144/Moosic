@@ -10,7 +10,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: 'https://moosic-liart.vercel.app/',
+  base: '/',
   build: {
     outDir: 'dist',
     rollupOptions: {
