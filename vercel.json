@@ -2,28 +2,37 @@
   "version": 2,
   "builds": [
     {
+      "src": "application.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "runtime": "python3.9"
+      }
+    },
+    {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist"
       }
-    },
-    {
-      "src": "server.py",
-      "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "server.py"
+      "dest": "/application.py"
     },
     {
       "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/$1"
+      "dest": "/dist/$1"
     }
-  ]
+  ],
+  "env": {
+    "PYTHONPATH": ".",
+    "FLASK_APP": "application.py",
+    "FLASK_ENV": "production"
+  }
 }
