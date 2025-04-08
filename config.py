@@ -4,23 +4,28 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Environment
+IS_PRODUCTION = os.getenv('VERCEL_ENV') == 'production'
+
+# URLs
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app' if IS_PRODUCTION else 'http://localhost:5173')
+BACKEND_URL = os.getenv('BACKEND_URL', 'https://moosic-liart.vercel.app' if IS_PRODUCTION else 'http://localhost:3001')
+
 # Spotify Configuration
 SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
 SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
-SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', 'https://moosic-liart.vercel.app/api/callback')
+SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', f'{BACKEND_URL}/api/callback')
 
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # Server Configuration
 SERVER_PORT = int(os.getenv('PORT', '3001'))
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app/')
 
 # CORS Configuration
-CORS_ORIGINS = [
-    FRONTEND_URL,
-    'https://moosic-liart.vercel.app/',  # For local development
-]
+CORS_ORIGINS = [FRONTEND_URL]
+if not IS_PRODUCTION:
+    CORS_ORIGINS.extend(['http://localhost:5173', 'http://localhost:3001'])
 
 # Check required environment variables
 required_vars = [
