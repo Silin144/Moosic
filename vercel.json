@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "server.py", "use": "@vercel/python" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "server.py" }
+  ],
+  "env": {
+    "FRONTEND_URL": "https://moosic-liart.vercel.app",
+    "SPOTIFY_REDIRECT_URI": "https://moosic-liart.vercel.app/api/callback"
+  }
+}

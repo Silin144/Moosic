@@ -12,7 +12,7 @@ export default function Header() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetch('http://127.0.0.1:3001/api/me')
+    fetch('/api/me')
       .then(res => res.json())
       .then(data => setUser(data))
       .catch(console.error)
@@ -20,8 +20,11 @@ export default function Header() {
 
   const handleLogout = async () => {
     try {
-      await fetch('http://127.0.0.1:3001/api/logout', { method: 'POST' })
-      navigate('/auth')
+      await fetch('/api/logout')
+      // Clear local state
+      setUser(null)
+      // Force reload to clear Spotify's OAuth state
+      window.location.href = '/auth'
     } catch (error) {
       console.error('Logout failed:', error)
     }
