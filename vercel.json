@@ -2,12 +2,15 @@
   "version": 2,
   "builds": [
     {
-      "src": "server.py",
-      "use": "@vercel/python"
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     },
     {
-      "src": "package.json",
-      "use": "@vercel/node"
+      "src": "server.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
@@ -16,15 +19,11 @@
       "dest": "server.py"
     },
     {
-      "src": "^/assets/(.*)",
-      "dest": "/dist/assets/$1"
+      "handle": "filesystem"
     },
     {
-      "src": "^/(?!api).*",
-      "dest": "/dist/index.html"
+      "src": "/(.*)",
+      "dest": "/$1"
     }
-  ],
-  "env": {
-    "PYTHONPATH": "."
-  }
+  ]
 }
