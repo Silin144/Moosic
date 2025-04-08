@@ -14,7 +14,7 @@ function App() {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:3001/api/check-auth')
+      const res = await fetch('/api/check-auth')
       const data = await res.json()
       setIsAuthenticated(data.authenticated)
     } catch (error) {

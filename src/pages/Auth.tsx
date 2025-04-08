@@ -8,7 +8,7 @@ export default function Auth() {
   useEffect(() => {
     // Only open the login window if we're not already in the process
     if (!window.location.search.includes('?from=spotify')) {
-      const loginWindow = window.open('http://localhost:3001/api/login', 'Spotify Login', 'width=800,height=600')
+      const loginWindow = window.open('/api/login', 'Spotify Login', 'width=800,height=600')
       if (!loginWindow) {
         setError('Popup was blocked. Please allow popups for this site.')
       }
@@ -17,8 +17,7 @@ export default function Auth() {
     // Listen for messages from the auth window
     const handleMessage = (event: MessageEvent) => {
       // Accept messages from either the API server or the development server
-      if ((event.origin === 'http://localhost:3001' || event.origin === 'http://localhost:5173')
-          && event.data === 'auth_success') {
+      if (event.data === 'auth_success') {
         // Add a small delay to allow the auth check to complete
         setTimeout(() => navigate('/'), 1000)
       }
@@ -30,7 +29,7 @@ export default function Auth() {
 
   const handleLogin = () => {
     setError('')
-    const loginWindow = window.open('http://localhost:3001/api/login', 'Spotify Login', 'width=800,height=600')
+    const loginWindow = window.open('/api/login', 'Spotify Login', 'width=800,height=600')
     if (!loginWindow) {
       setError('Popup was blocked. Please allow popups for this site.')
     }
