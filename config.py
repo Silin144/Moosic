@@ -7,19 +7,19 @@ load_dotenv()
 # Spotify Configuration
 SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
 SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
-SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', 'http://localhost:3001/api/callback')
+SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', 'https://moosic-liart.vercel.app//api/callback')
 
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # Server Configuration
 SERVER_PORT = int(os.getenv('PORT', '3001'))
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app/')
 
 # CORS Configuration
 CORS_ORIGINS = [
     FRONTEND_URL,
-    'http://localhost:3001',  # For local development
+    'https://moosic-liart.vercel.app/',  # For local development
 ]
 
 # Check required environment variables
