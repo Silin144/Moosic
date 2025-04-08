@@ -14,7 +14,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Set Spotify redirect URI
-export SPOTIPY_REDIRECT_URI="http://localhost:3001/api/callback"
+export SPOTIPY_REDIRECT_URI="https://moosic-liart.vercel.app//api/callback"
 
 # Start the Python server in the background
 python3 server.py &
