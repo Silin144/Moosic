@@ -28,8 +28,8 @@ export default function Auth() {
   const handleLogin = () => {
     setIsLoading(true)
     setError(null)
-    // Use the full backend URL
-    window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
+    // Use window.location.replace() to prevent page reload
+    window.location.replace(`${import.meta.env.VITE_API_URL}/api/login`)
   }
 
   if (isLoading) {
