@@ -13,7 +13,6 @@ const Auth: React.FC = () => {
   useEffect(() => {
     const code = searchParams.get('code')
     const error = searchParams.get('error')
-    const from = searchParams.get('from')
 
     if (error) {
       setError(error)
@@ -21,8 +20,8 @@ const Auth: React.FC = () => {
       return
     }
 
-    if (code && from === 'spotify') {
-      login(code)
+    if (code === 'success') {
+      login()
       navigate('/')
     }
   }, [searchParams, navigate, login])
@@ -33,34 +32,39 @@ const Auth: React.FC = () => {
     window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
   }
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <CircularProgress />
-      </Box>
-    )
-  }
-
   return (
     <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" minHeight="100vh" gap={2}>
       <Typography variant="h4" component="h1" gutterBottom>
         Welcome to Moosic
       </Typography>
-      {error && (
-        <Typography color="error" variant="body1" sx={{ mb: 2 }}>
-          {error}
-        </Typography>
+      {loading ? (
+        <CircularProgress />
+      ) : error ? (
+        <>
+          <Typography color="error" variant="body1" sx={{ mb: 2 }}>
+            {error}
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleLogin}
+            size="large"
+            sx={{ mt: 2 }}
+          >
+            Try Again
+          </Button>
+        </>
+      ) : (
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleLogin}
+          size="large"
+          sx={{ mt: 2 }}
+        >
+          Login with Spotify
+        </Button>
       )}
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={handleLogin}
-        disabled={loading}
-        size="large"
-        sx={{ mt: 2 }}
-      >
-        Login with Spotify
-      </Button>
     </Box>
   )
 }

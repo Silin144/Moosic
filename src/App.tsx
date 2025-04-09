@@ -2,63 +2,54 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import Home from './pages/Home'
-import Auth from './pages/Auth'
+import { AuthProvider } from './contexts/AuthContext'
+import { useAuth } from './contexts/AuthContext'
 import GeneratePlaylist from './pages/GeneratePlaylist'
+import Auth from './pages/Auth'
 import Navbar from './components/Navbar'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
 
-const theme = createTheme({
+const darkTheme = createTheme({
   palette: {
     mode: 'dark',
-    primary: {
-      main: '#1DB954', // Spotify green
-    },
-    secondary: {
-      main: '#FFFFFF',
-    },
-    background: {
-      default: '#121212',
-      paper: '#181818',
-    },
   },
 })
 
 const queryClient = new QueryClient()
 
-function AppContent() {
+const AppContent = () => {
   const { isAuthenticated } = useAuth()
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Router>
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route
-            path="/generate"
-            element={
-              isAuthenticated ? (
-                <GeneratePlaylist />
-              ) : (
-                <Navigate to="/auth" replace />
-              )
-            }
-          />
-        </Routes>
-      </Router>
-    </ThemeProvider>
+    <>
+      <Navbar />
+      <Routes>
+        <Route path="/auth" element={<Auth />} />
+        <Route
+          path="/"
+          element={
+            isAuthenticated ? (
+              <GeneratePlaylist />
+            ) : (
+              <Navigate to="/auth" replace />
+            )
+          }
+        />
+      </Routes>
+    </>
   )
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <ThemeProvider theme={darkTheme}>
+        <CssBaseline />
+        <AuthProvider>
+          <Router>
+            <AppContent />
+          </Router>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   )
 }

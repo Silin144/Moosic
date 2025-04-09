@@ -1,45 +1,18 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  login: (code: string) => void;
+  login: () => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  useEffect(() => {
-    // Check if user is authenticated on mount
-    const checkAuth = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/check-auth`, {
-          credentials: 'include',
-        });
-        const data = await response.json();
-        setIsAuthenticated(data.authenticated);
-      } catch (error) {
-        setIsAuthenticated(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
-
-  const login = async (code: string) => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/callback?code=${code}`);
-      if (response.ok) {
-        setIsAuthenticated(true);
-      } else {
-        throw new Error('Failed to authenticate');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
+  const login = () => {
+    setIsAuthenticated(true);
   };
 
   const logout = () => {
