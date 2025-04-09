@@ -109,8 +109,8 @@ def get_spotify_client():
 def login():
     try:
         auth_url = sp_oauth.get_authorize_url()
-        logger.info(f"Generated Spotify auth URL: {auth_url}")
-        return jsonify({'auth_url': auth_url})
+        logger.info(f"Redirecting to Spotify auth URL: {auth_url}")
+        return redirect(auth_url)
     except Exception as e:
         logger.error(f"Error in login: {str(e)}")
         return jsonify({'error': str(e)}), 500

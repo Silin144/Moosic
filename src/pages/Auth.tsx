@@ -19,7 +19,6 @@ export default function Auth() {
     }
 
     if (from === 'spotify') {
-      // We've been redirected back from Spotify
       setIsLoading(false)
       navigate('/')
     }
@@ -28,54 +27,7 @@ export default function Auth() {
   const handleLogin = () => {
     setIsLoading(true)
     setError(null)
-    
-    // First check if the API URL is available
-    if (!import.meta.env.VITE_API_URL) {
-      setError('API URL is not configured')
-      setIsLoading(false)
-      return
-    }
-
-    console.log('Making request to:', `${import.meta.env.VITE_API_URL}/api/login`)
-
-    // Make the request to the login endpoint
-    fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Origin': window.location.origin
-      },
-      mode: 'cors'
-    })
-    .then(async (response) => {
-      console.log('Response status:', response.status)
-      if (!response.ok) {
-        const text = await response.text()
-        console.error('Error response:', text)
-        try {
-          const errorData = JSON.parse(text)
-          throw new Error(errorData.error || 'Failed to login')
-        } catch (e) {
-          throw new Error(`Failed to login: ${text}`)
-        }
-      }
-      return response.json()
-    })
-    .then((data) => {
-      console.log('Received data:', data)
-      if (data.auth_url) {
-        window.location.href = data.auth_url
-      } else {
-        throw new Error('No auth URL received')
-      }
-    })
-    .catch((err) => {
-      console.error('Login error:', err)
-      setError(err.message || 'Failed to connect to the server')
-      setIsLoading(false)
-    })
+    window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
   }
 
   if (isLoading) {
