@@ -178,28 +178,26 @@ const GeneratePlaylist: React.FC = () => {
             <Typography variant="h6" gutterBottom>
               Preview Tracks
             </Typography>
-            <Grid container spacing={2}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
               {preview.tracks.map((track, index) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <CardMedia
-                      component="img"
-                      height="140"
-                      image={track.image}
-                      alt={track.name}
-                    />
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Typography gutterBottom variant="h6" component="div">
-                        {track.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {track.artist}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
+                <Card key={index} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <CardMedia
+                    component="img"
+                    height="140"
+                    image={track.image}
+                    alt={track.name}
+                  />
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Typography gutterBottom variant="h6" component="div">
+                      {track.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {track.artist}
+                    </Typography>
+                  </CardContent>
+                </Card>
               ))}
-            </Grid>
+            </Box>
           </CardContent>
         </Card>
       )}

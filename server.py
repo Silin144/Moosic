@@ -5,6 +5,7 @@ import json
 import time
 from flask import Flask, request, jsonify, redirect, session
 from flask_cors import CORS
+from flask_session import Session
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import openai
@@ -49,6 +50,17 @@ ssl_context = (
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
 
+# Configure session
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
+
+# Initialize Flask-Session
+Session(app)
+
 # Configure CORS
 CORS(app, resources={
     r"/api/*": {
@@ -74,10 +86,6 @@ def after_request(response):
 # Configure for environment
 is_production = os.getenv('ENVIRONMENT') == 'production'
 app.config['PREFERRED_URL_SCHEME'] = 'https'
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
 
 # Configure logging
 import logging
