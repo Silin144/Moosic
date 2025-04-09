@@ -58,6 +58,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
 app.config['SESSION_COOKIE_NAME'] = 'moosic_session'  # Unique session cookie name
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Refresh session on each request
 
 # Initialize Flask-Session
 Session(app)
@@ -151,10 +152,12 @@ def callback():
         sp = spotipy.Spotify(auth=token_info['access_token'])
         user_info = sp.current_user()
         session['user_id'] = user_info['id']  # Store user ID in session
+        session['user_info'] = user_info  # Store user info in session
 
-        return redirect(f"{os.getenv('FRONTEND_URL')}?from=spotify")
+        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?from=spotify")
     except Exception as e:
         logger.error(f"Error in callback: {str(e)}")
+        session.clear()  # Clear session on error
         return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={str(e)}")
 
 @app.route('/api/check-auth')
@@ -186,7 +189,14 @@ def check_auth():
             session.clear()
             return jsonify({'authenticated': False})
 
-        return jsonify({'authenticated': True})
+        return jsonify({
+            'authenticated': True,
+            'user': {
+                'id': current_user['id'],
+                'display_name': current_user['display_name'],
+                'images': current_user['images']
+            }
+        })
     except Exception as e:
         logger.error(f'Error checking auth: {e}')
         session.clear()
