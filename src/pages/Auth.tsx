@@ -44,7 +44,16 @@ const Auth: React.FC = () => {
   }
 
   return (
-    <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" minHeight="100vh" gap={2}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        gap: 2,
+      }}
+    >
       <Typography variant="h4" component="h1" gutterBottom>
         Welcome to Moosic
       </Typography>

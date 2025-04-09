@@ -6,7 +6,6 @@ import { AuthProvider } from './contexts/AuthContext'
 import { useAuth } from './contexts/AuthContext'
 import GeneratePlaylist from './pages/GeneratePlaylist'
 import Auth from './pages/Auth'
-import Navbar from './components/Navbar'
 
 const darkTheme = createTheme({
   palette: {
@@ -20,23 +19,20 @@ const AppContent = () => {
   const { isAuthenticated } = useAuth()
 
   return (
-    <>
-      <Navbar />
-      <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route
-          path="/"
-          element={
-            isAuthenticated ? (
-              <GeneratePlaylist />
-            ) : (
-              <Navigate to="/auth" replace />
-            )
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </>
+    <Routes>
+      <Route path="/auth" element={<Auth />} />
+      <Route
+        path="/"
+        element={
+          isAuthenticated ? (
+            <GeneratePlaylist />
+          ) : (
+            <Navigate to="/auth" replace />
+          )
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 
