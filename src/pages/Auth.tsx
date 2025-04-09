@@ -32,9 +32,15 @@ const Auth: React.FC = () => {
     if (code && from === 'spotify') {
       console.log('Auth success, logging in...')
       fetch(`${import.meta.env.VITE_API_URL}/api/callback?code=${code}`, {
+        method: 'GET',
         credentials: 'include',
       })
-        .then((response) => response.json())
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('Failed to exchange code for token')
+          }
+          return response.json()
+        })
         .then((data) => {
           if (data.access_token) {
             localStorage.setItem('spotify_token', data.access_token)
@@ -46,8 +52,8 @@ const Auth: React.FC = () => {
           }
         })
         .catch((err) => {
-          console.error(err.message)
-          setError(err.message)
+          console.error('Token exchange error:', err)
+          setError(err.message || 'Failed to exchange code for token')
         })
         .finally(() => {
           setLoading(false)

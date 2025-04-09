@@ -137,28 +137,29 @@ def callback():
         if not code:
             error = request.args.get('error')
             logger.error(f"Callback error: {error}")
-            return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={error}")
+            return jsonify({'error': error}), 400
 
         # Exchange the code for an access token
         logger.info("Attempting to exchange code for token")
         token_info = sp_oauth.get_access_token(code)
         if not token_info:
             logger.error("Failed to get access token")
-            return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=Failed to get access token")
+            return jsonify({'error': 'Failed to get access token'}), 500
 
         # Store the token info in the session
         session['token_info'] = token_info
         logger.info("Successfully stored token info in session")
 
-        # Redirect to frontend with success and from=spotify parameter
-        frontend_url = os.getenv('FRONTEND_URL')
-        redirect_url = f"{frontend_url}/auth?code={code}&from=spotify"
-        logger.info(f"Redirecting to: {redirect_url}")
-        return redirect(redirect_url)
+        # Return the access token to the frontend
+        return jsonify({
+            'access_token': token_info['access_token'],
+            'expires_in': token_info['expires_in'],
+            'refresh_token': token_info['refresh_token']
+        })
 
     except Exception as e:
         logger.error(f"Error in callback: {str(e)}", exc_info=True)
-        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/check-auth')
 def check_auth():
