@@ -6,11 +6,16 @@ import { useAuth } from '../contexts/AuthContext'
 const Auth: React.FC = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { setIsAuthenticated } = useAuth()
+  const { isAuthenticated, setIsAuthenticated } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/')
+      return
+    }
+
     const code = searchParams.get('code')
     const error = searchParams.get('error')
     const from = searchParams.get('from')
@@ -34,7 +39,7 @@ const Auth: React.FC = () => {
           if (data.access_token) {
             localStorage.setItem('spotify_token', data.access_token)
             setIsAuthenticated(true)
-            navigate('/')
+            navigate('/', { replace: true })
           } else {
             console.error('Failed to get access token')
             setError('Failed to get access token')
@@ -50,7 +55,7 @@ const Auth: React.FC = () => {
     } else {
       setLoading(false)
     }
-  }, [searchParams, navigate, setIsAuthenticated])
+  }, [searchParams, navigate, setIsAuthenticated, isAuthenticated])
 
   const handleLogin = () => {
     console.log('Initiating login...')

@@ -1,136 +1,195 @@
-import React, { useState } from 'react';
-import { Box, Button, CircularProgress, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Container,
+  Paper,
+  Chip,
+  CircularProgress,
+  Alert,
+} from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 
-const moods = ['Happy', 'Sad', 'Energetic', 'Relaxed', 'Motivated', 'Nostalgic'];
-const genres = ['Pop', 'Rock', 'Hip Hop', 'Electronic', 'Jazz', 'Classical', 'R&B', 'Country'];
-const eras = ['2000s', '2010s', '2020s', '90s', '80s', '70s', '60s'];
+const moods = [
+  'Happy',
+  'Sad',
+  'Energetic',
+  'Calm',
+  'Motivated',
+  'Relaxed',
+  'Focused',
+  'Nostalgic',
+  'Romantic',
+  'Angry',
+];
+
+const genres = [
+  'Pop',
+  'Rock',
+  'Hip Hop',
+  'R&B',
+  'Electronic',
+  'Jazz',
+  'Classical',
+  'Country',
+  'Indie',
+  'Metal',
+  'Folk',
+  'Blues',
+  'Reggae',
+  'Soul',
+  'Funk',
+];
 
 const GeneratePlaylist = () => {
-  const [mood, setMood] = useState('');
-  const [genre, setGenre] = useState('');
-  const [era, setEra] = useState('');
+  const navigate = useNavigate();
   const { logout } = useAuth();
+  const [selectedMood, setSelectedMood] = useState<string>('');
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [playlistName, setPlaylistName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['playlist', mood, genre, era],
-    queryFn: async () => {
-      if (!mood) return null;
-      
+  const handleMoodSelect = (mood: string) => {
+    setSelectedMood(mood);
+  };
+
+  const handleGenreSelect = (genre: string) => {
+    setSelectedGenres((prev) => {
+      if (prev.includes(genre)) {
+        return prev.filter((g) => g !== genre);
+      }
+      if (prev.length < 3) {
+        return [...prev, genre];
+      }
+      return prev;
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMood || selectedGenres.length === 0 || !playlistName) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate-playlist`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ mood, genre, era }),
         credentials: 'include',
+        body: JSON.stringify({
+          mood: selectedMood,
+          genres: selectedGenres,
+          playlist_name: playlistName,
+        }),
       });
 
       if (!response.ok) {
         throw new Error('Failed to generate playlist');
       }
 
-      return response.json();
-    },
-    enabled: false,
-  });
-
-  const handleGenerate = () => {
-    if (mood) {
-      refetch();
+      const data = await response.json();
+      if (data.success) {
+        navigate('/success');
+      } else {
+        setError(data.error || 'Failed to generate playlist');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Box sx={{ p: 4, maxWidth: 600, mx: 'auto' }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Generate Your Playlist
-      </Typography>
-
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mb: 4 }}>
-        <FormControl fullWidth>
-          <InputLabel>Mood</InputLabel>
-          <Select
-            value={mood}
-            label="Mood"
-            onChange={(e) => setMood(e.target.value)}
-          >
-            {moods.map((m) => (
-              <MenuItem key={m} value={m.toLowerCase()}>
-                {m}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <FormControl fullWidth>
-          <InputLabel>Genre (Optional)</InputLabel>
-          <Select
-            value={genre}
-            label="Genre"
-            onChange={(e) => setGenre(e.target.value)}
-          >
-            <MenuItem value="">Any</MenuItem>
-            {genres.map((g) => (
-              <MenuItem key={g} value={g.toLowerCase()}>
-                {g}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <FormControl fullWidth>
-          <InputLabel>Era (Optional)</InputLabel>
-          <Select
-            value={era}
-            label="Era"
-            onChange={(e) => setEra(e.target.value)}
-          >
-            <MenuItem value="">Any</MenuItem>
-            {eras.map((e) => (
-              <MenuItem key={e} value={e.toLowerCase()}>
-                {e}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <Button
-          variant="contained"
-          onClick={handleGenerate}
-          disabled={!mood || isLoading}
-          sx={{ mt: 2 }}
-        >
-          {isLoading ? <CircularProgress size={24} /> : 'Generate Playlist'}
-        </Button>
-
-        <Button
-          variant="outlined"
-          onClick={logout}
-          sx={{ mt: 2 }}
-        >
-          Logout
-        </Button>
-      </Box>
-
-      {error && (
-        <Typography color="error" sx={{ mt: 2 }}>
-          {error.message}
+    <Container maxWidth="md">
+      <Paper elevation={3} sx={{ p: 4, mt: 4, mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom align="center">
+          Create Your Playlist
         </Typography>
-      )}
 
-      {data && (
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h6" gutterBottom>
-            Your Playlist
-          </Typography>
-          <Typography variant="body1">
-            Playlist created successfully! Check your Spotify account.
-          </Typography>
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 4 }}>
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              Select Your Mood
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {moods.map((mood) => (
+                <Chip
+                  key={mood}
+                  label={mood}
+                  onClick={() => handleMoodSelect(mood)}
+                  color={selectedMood === mood ? 'primary' : 'default'}
+                  sx={{ m: 0.5 }}
+                />
+              ))}
+            </Box>
+          </Box>
+
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              Select Up to 3 Genres
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {genres.map((genre) => (
+                <Chip
+                  key={genre}
+                  label={genre}
+                  onClick={() => handleGenreSelect(genre)}
+                  color={selectedGenres.includes(genre) ? 'primary' : 'default'}
+                  sx={{ m: 0.5 }}
+                />
+              ))}
+            </Box>
+          </Box>
+
+          <Box sx={{ mb: 4 }}>
+            <TextField
+              fullWidth
+              label="Playlist Name"
+              value={playlistName}
+              onChange={(e) => setPlaylistName(e.target.value)}
+              required
+            />
+          </Box>
+
+          {error && (
+            <Box sx={{ mb: 4 }}>
+              <Alert severity="error">{error}</Alert>
+            </Box>
+          )}
+
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              type="submit"
+              disabled={loading}
+              sx={{ minWidth: 200 }}
+            >
+              {loading ? <CircularProgress size={24} /> : 'Generate Playlist'}
+            </Button>
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={logout}
+              sx={{ minWidth: 200 }}
+            >
+              Logout
+            </Button>
+          </Box>
         </Box>
-      )}
-    </Box>
+      </Paper>
+    </Container>
   );
 };
 
