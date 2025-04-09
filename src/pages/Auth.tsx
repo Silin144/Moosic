@@ -7,30 +7,21 @@ const Auth: React.FC = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { isAuthenticated, setIsAuthenticated } = useAuth()
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/', { replace: true })
-      return
-    }
-
     const code = searchParams.get('code')
     const error = searchParams.get('error')
     const from = searchParams.get('from')
 
-    console.log('Auth component mounted with params:', { code, error, from })
-
     if (error) {
-      console.error('Auth error:', error)
       setError(error)
-      setLoading(false)
       return
     }
 
     if (code && from === 'spotify') {
-      console.log('Auth success, logging in...')
+      setLoading(true)
       fetch(`${import.meta.env.VITE_API_URL}/api/callback?code=${code}`, {
         method: 'GET',
         credentials: 'include',
@@ -47,29 +38,22 @@ const Auth: React.FC = () => {
             setIsAuthenticated(true)
             navigate('/', { replace: true })
           } else {
-            console.error('Failed to get access token')
             setError('Failed to get access token')
           }
         })
         .catch((err) => {
-          console.error('Token exchange error:', err)
           setError(err.message || 'Failed to exchange code for token')
         })
         .finally(() => {
           setLoading(false)
         })
-    } else {
-      setLoading(false)
     }
-  }, [searchParams, navigate, setIsAuthenticated, isAuthenticated])
+  }, [searchParams, navigate, setIsAuthenticated])
 
   const handleLogin = () => {
-    console.log('Initiating login...')
     setLoading(true)
     setError(null)
-    const loginUrl = `${import.meta.env.VITE_API_URL}/api/login`
-    console.log('Login URL:', loginUrl)
-    window.location.href = loginUrl
+    window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
   }
 
   if (loading) {
@@ -98,13 +82,7 @@ const Auth: React.FC = () => {
         <Typography color="error" variant="h6">
           {error}
         </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleLogin}
-          size="large"
-          sx={{ mt: 2 }}
-        >
+        <Button variant="contained" onClick={handleLogin}>
           Try Again
         </Button>
       </Box>
@@ -125,10 +103,8 @@ const Auth: React.FC = () => {
       </Typography>
       <Button
         variant="contained"
-        color="primary"
         onClick={handleLogin}
-        size="large"
-        sx={{ mt: 2 }}
+        disabled={loading}
       >
         Login with Spotify
       </Button>

@@ -123,34 +123,29 @@ def login():
 
 @app.route('/api/callback')
 def callback():
-    """Handle Spotify OAuth callback"""
     try:
-        logger.info("Received callback request")
-        logger.info(f"Request args: {request.args}")
-        logger.info(f"Request headers: {dict(request.headers)}")
-
         code = request.args.get('code')
         if not code:
             logger.error("No code received in callback")
             return jsonify({'error': 'No code received'}), 400
 
-        # Exchange the code for an access token
-        logger.info("Attempting to exchange code for token")
         token_info = sp_oauth.get_access_token(code)
         if not token_info:
             logger.error("Failed to get access token")
-            return jsonify({'error': 'Failed to get access token'}), 500
+            return jsonify({'error': 'Failed to get access token'}), 400
 
-        # Store the token info in the session
         session['token_info'] = token_info
         logger.info("Successfully obtained token info")
 
-        # Redirect to frontend with success
-        frontend_url = os.getenv('FRONTEND_URL', 'https://moosic.vercel.app')
-        return redirect(f"{frontend_url}/auth?from=spotify")
+        # Return the token info to the frontend
+        return jsonify({
+            'access_token': token_info['access_token'],
+            'expires_in': token_info['expires_in'],
+            'refresh_token': token_info['refresh_token']
+        })
 
     except Exception as e:
-        logger.error(f"Error in callback: {str(e)}", exc_info=True)
+        logger.error(f"Error in callback: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/check-auth')
