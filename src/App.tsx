@@ -15,7 +15,7 @@ function AppContent() {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch('/api/check-auth')
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/check-auth`)
       if (!res.ok) {
         throw new Error('Authentication check failed')
       }

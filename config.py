@@ -9,7 +9,7 @@ IS_PRODUCTION = os.getenv('VERCEL_ENV') == 'production'
 
 # URLs
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app' if IS_PRODUCTION else 'http://localhost:5173')
-BACKEND_URL = os.getenv('BACKEND_URL', 'https://moosic-liart.vercel.app' if IS_PRODUCTION else 'http://localhost:3001')
+BACKEND_URL = os.getenv('BACKEND_URL', 'http://ec2-3-146-249-79.us-east-2.compute.amazonaws.com:3001' if IS_PRODUCTION else 'http://localhost:3001')
 
 # Spotify Configuration
 SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')

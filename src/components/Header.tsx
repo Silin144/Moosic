@@ -12,7 +12,7 @@ export default function Header() {
   const navigate = useNavigate() // Used in handleLogout
 
   useEffect(() => {
-    fetch('/api/me')
+    fetch(`${import.meta.env.VITE_API_URL}/api/me`)
       .then(res => res.json())
       .then(data => setUser(data))
       .catch(console.error)
@@ -20,7 +20,7 @@ export default function Header() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/logout')
+      await fetch(`${import.meta.env.VITE_API_URL}/api/logout`)
       // Clear local state
       setUser(null)
       // Force reload to clear Spotify's OAuth state

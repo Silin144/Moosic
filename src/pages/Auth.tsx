@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
+const API_URL = 'http://3.148.173.124:3001'
+
 export default function Auth() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -29,7 +31,7 @@ export default function Auth() {
 
     // Only open the login window if we're not already in the process
     if (!searchParams.has('from')) {
-      const loginWindow = window.open('/api/login', 'Spotify Login', 'width=800,height=600')
+      const loginWindow = window.open(`${API_URL}/api/login`, 'Spotify Login', 'width=800,height=600')
       if (!loginWindow) {
         setError('Popup was blocked. Please allow popups for this site.')
         setIsLoading(false)
@@ -52,7 +54,7 @@ export default function Auth() {
   const handleLogin = () => {
     setError('')
     setIsLoading(true)
-    const loginWindow = window.open('/api/login', 'Spotify Login', 'width=800,height=600')
+    const loginWindow = window.open(`${API_URL}/api/login`, 'Spotify Login', 'width=800,height=600')
     if (!loginWindow) {
       setError('Popup was blocked. Please allow popups for this site.')
       setIsLoading(false)

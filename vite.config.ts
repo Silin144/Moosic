@@ -12,20 +12,17 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: process.env.BACKEND_URL || 'http://localhost:3001',
+        target: process.env.VITE_API_URL || 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
       },
     },
   },
   build: {
+    outDir: 'dist',
     rollupOptions: {
-      output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'form-vendor': ['react-hook-form', '@hookform/resolvers/zod', 'zod'],
-          'query-vendor': ['@tanstack/react-query'],
-        },
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
       },
     },
     sourcemap: true,
