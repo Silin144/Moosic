@@ -28,20 +28,40 @@ export default function Auth() {
   const handleLogin = () => {
     setIsLoading(true)
     setError(null)
-    // Use a proper redirect with error handling
+    
+    // First check if the API URL is available
+    if (!import.meta.env.VITE_API_URL) {
+      setError('API URL is not configured')
+      setIsLoading(false)
+      return
+    }
+
+    // Make the request to the login endpoint
     fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
       method: 'GET',
-      redirect: 'follow',
+      credentials: 'include',  // Include cookies
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
     })
-    .then(response => {
-      if (response.redirected) {
-        window.location.href = response.url
+    .then(async (response) => {
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to login')
+      }
+      return response.json()
+    })
+    .then((data) => {
+      if (data.auth_url) {
+        window.location.href = data.auth_url
       } else {
-        throw new Error('Failed to get redirect URL')
+        throw new Error('No auth URL received')
       }
     })
-    .catch(err => {
-      setError(err.message)
+    .catch((err) => {
+      console.error('Login error:', err)
+      setError(err.message || 'Failed to connect to the server')
       setIsLoading(false)
     })
   }

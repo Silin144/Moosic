@@ -44,13 +44,21 @@ app.secret_key = os.urandom(24)  # Required for session handling
 # Configure CORS
 CORS(app, resources={
     r"/api/*": {
-        "origins": [os.getenv('FRONTEND_URL'), 'https://*.vercel.app'],
+        "origins": ["*"],  # Allow all origins during development
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "Origin", "Accept"],
         "supports_credentials": True,
         "expose_headers": ["Content-Type", "Authorization"]
     }
 })
+
+# Add error handler for CORS
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 # Configure for environment
 is_production = os.getenv('ENVIRONMENT') == 'production'
@@ -98,8 +106,8 @@ def get_spotify_client():
 def login():
     try:
         auth_url = sp_oauth.get_authorize_url()
-        logger.info(f"Redirecting to Spotify auth URL: {auth_url}")
-        return redirect(auth_url)
+        logger.info(f"Generated Spotify auth URL: {auth_url}")
+        return jsonify({'auth_url': auth_url})
     except Exception as e:
         logger.error(f"Error in login: {str(e)}")
         return jsonify({'error': str(e)}), 500
