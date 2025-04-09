@@ -72,8 +72,8 @@ def after_request(response):
 
 # Configure for environment
 is_production = os.getenv('ENVIRONMENT') == 'production'
-app.config['PREFERRED_URL_SCHEME'] = 'http'  # Use HTTP since ngrok handles HTTPS
-app.config['SESSION_COOKIE_SECURE'] = False  # Allow non-HTTPS cookies
+app.config['PREFERRED_URL_SCHEME'] = 'https'
+app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
@@ -324,6 +324,6 @@ def retry_with_backoff(func, max_retries=3, initial_delay=1):
     raise last_exception
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 3001))
+    port = int(os.getenv('PORT', 10000))
     host = os.getenv('HOST', '0.0.0.0')
-    app.run(host=host, port=port, debug=False)  # Remove SSL context 
+    app.run(host=host, port=port, debug=False) 
