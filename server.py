@@ -9,6 +9,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import openai
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 # Load environment variables
 load_dotenv()
@@ -75,8 +76,23 @@ sp_oauth = SpotifyOAuth(
     show_dialog=True
 )
 
-# Initialize Spotify client
-sp = spotipy.Spotify(auth_manager=sp_oauth)
+def get_spotify_client():
+    """Get a Spotify client with a valid token"""
+    token_info = session.get('token_info', None)
+    
+    if not token_info:
+        raise Exception('No token found in session')
+    
+    # Check if token is expired
+    now = int(time.time())
+    is_expired = token_info['expires_at'] - now < 60  # Refresh if less than 60 seconds left
+    
+    if is_expired:
+        logger.info('Token expired, refreshing...')
+        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+        session['token_info'] = token_info
+    
+    return spotipy.Spotify(auth=token_info['access_token'])
 
 @app.route('/api/login')
 def login():
@@ -103,7 +119,10 @@ def callback():
             logger.error('Failed to get access token')
             return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=token_failed")
         
+        # Add expiration time to token info
+        token_info['expires_at'] = int(time.time()) + token_info['expires_in']
         session['token_info'] = token_info
+        
         logger.info('Successfully authenticated with Spotify')
         return redirect(f"{os.getenv('FRONTEND_URL')}/auth?from=spotify")
         
@@ -114,10 +133,25 @@ def callback():
 @app.route('/api/check-auth')
 def check_auth():
     try:
-        token_info = sp_oauth.get_cached_token()
-        if not token_info or sp_oauth.is_token_expired(token_info):
+        token_info = session.get('token_info', None)
+        if not token_info:
             return jsonify({'authenticated': False})
         
+        # Check if token is expired
+        now = int(time.time())
+        is_expired = token_info['expires_at'] - now < 60
+        
+        if is_expired:
+            try:
+                token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+                token_info['expires_at'] = int(time.time()) + token_info['expires_in']
+                session['token_info'] = token_info
+            except Exception as e:
+                logger.error(f'Error refreshing token: {e}')
+                return jsonify({'authenticated': False})
+        
+        # Verify token is valid by making a simple API call
+        sp = spotipy.Spotify(auth=token_info['access_token'])
         sp.current_user()
         return jsonify({'authenticated': True})
     except Exception as e:
@@ -127,6 +161,7 @@ def check_auth():
 @app.route('/api/me')
 def get_me():
     try:
+        sp = get_spotify_client()
         user = retry_with_backoff(lambda: sp.current_user())
         return jsonify(user)
     except Exception as e:
@@ -136,6 +171,7 @@ def get_me():
 @app.route('/api/create-playlist', methods=['POST'])
 def create_playlist():
     try:
+        sp = get_spotify_client()
         data = request.json
         mood = data['mood']
         genres = data['genres']
