@@ -30,6 +30,7 @@
     "clsx": "^2.1.1",
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "framer-motion": "^12.6.3",
     "lucide-react": "^0.487.0",
     "node-fetch": "^3.3.2",
     "openai": "^4.92.1",
