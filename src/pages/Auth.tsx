@@ -28,7 +28,8 @@ export default function Auth() {
   const handleLogin = () => {
     setIsLoading(true)
     setError(null)
-    window.location.href = '/api/login'
+    // Use the backend URL directly for the login
+    window.location.href = 'http://3.148.173.124:3001/api/login'
   }
 
   if (isLoading) {
