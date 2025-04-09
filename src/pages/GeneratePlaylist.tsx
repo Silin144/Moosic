@@ -1,83 +1,50 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react'
 import {
   Box,
   Button,
   TextField,
   Typography,
-  Container,
-  Paper,
-  Chip,
   CircularProgress,
+  Card,
+  CardContent,
+  CardMedia,
+  Grid,
+  Chip,
   Alert,
-} from '@mui/material';
-import { useAuth } from '../contexts/AuthContext';
+  Snackbar
+} from '@mui/material'
+import { useAuth } from '../contexts/AuthContext'
 
-const moods = [
-  'Happy',
-  'Sad',
-  'Energetic',
-  'Calm',
-  'Motivated',
-  'Relaxed',
-  'Focused',
-  'Nostalgic',
-  'Romantic',
-  'Angry',
-];
+interface Track {
+  name: string
+  artist: string
+  image: string
+}
 
-const genres = [
-  'Pop',
-  'Rock',
-  'Hip Hop',
-  'R&B',
-  'Electronic',
-  'Jazz',
-  'Classical',
-  'Country',
-  'Indie',
-  'Metal',
-  'Folk',
-  'Blues',
-  'Reggae',
-  'Soul',
-  'Funk',
-];
+interface PlaylistPreview {
+  name: string
+  description: string
+  tracks: Track[]
+  url: string
+}
 
-const GeneratePlaylist = () => {
-  const navigate = useNavigate();
-  const { logout } = useAuth();
-  const [selectedMood, setSelectedMood] = useState<string>('');
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [playlistName, setPlaylistName] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const GeneratePlaylist: React.FC = () => {
+  const { isAuthenticated } = useAuth()
+  const [prompt, setPrompt] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<PlaylistPreview | null>(null)
+  const [openSnackbar, setOpenSnackbar] = useState(false)
 
-  const handleMoodSelect = (mood: string) => {
-    setSelectedMood(mood);
-  };
-
-  const handleGenreSelect = (genre: string) => {
-    setSelectedGenres((prev) => {
-      if (prev.includes(genre)) {
-        return prev.filter((g) => g !== genre);
-      }
-      if (prev.length < 3) {
-        return [...prev, genre];
-      }
-      return prev;
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedMood || selectedGenres.length === 0 || !playlistName) {
-      setError('Please fill in all fields');
-      return;
+  const handleGenerate = async () => {
+    if (!prompt.trim()) {
+      setError('Please enter a prompt')
+      return
     }
 
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
+    setPreview(null)
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate-playlist`, {
@@ -86,111 +53,165 @@ const GeneratePlaylist = () => {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({
-          mood: selectedMood,
-          genres: selectedGenres,
-          playlist_name: playlistName,
-        }),
-      });
+        body: JSON.stringify({ prompt }),
+      })
 
       if (!response.ok) {
-        throw new Error('Failed to generate playlist');
+        throw new Error('Failed to generate playlist')
       }
 
-      const data = await response.json();
-      if (data.success) {
-        navigate('/success');
-      } else {
-        setError(data.error || 'Failed to generate playlist');
-      }
+      const data = await response.json()
+      setPreview({
+        name: data.name,
+        description: data.description,
+        tracks: data.tracks || [],
+        url: data.playlist_url
+      })
+      setOpenSnackbar(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+      >
+        <Typography variant="h6">Please login to generate playlists</Typography>
+      </Box>
+    )
+  }
 
   return (
-    <Container maxWidth="md">
-      <Paper elevation={3} sx={{ p: 4, mt: 4, mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom align="center">
-          Create Your Playlist
-        </Typography>
+    <Box sx={{ p: 4, maxWidth: 1200, mx: 'auto' }}>
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{
+          fontWeight: 'bold',
+          mb: 4,
+          background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent'
+        }}
+      >
+        Generate Your Playlist
+      </Typography>
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 4 }}>
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h6" gutterBottom>
-              Select Your Mood
+      <Box sx={{ mb: 4 }}>
+        <TextField
+          fullWidth
+          multiline
+          rows={4}
+          variant="outlined"
+          label="Describe your perfect playlist"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="e.g., A playlist for a rainy day with indie folk music"
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              '& fieldset': {
+                borderColor: 'rgba(29, 185, 84, 0.5)',
+              },
+              '&:hover fieldset': {
+                borderColor: 'rgba(29, 185, 84, 0.8)',
+              },
+              '&.Mui-focused fieldset': {
+                borderColor: '#1DB954',
+              },
+            },
+          }}
+        />
+        <Button
+          variant="contained"
+          onClick={handleGenerate}
+          disabled={loading}
+          sx={{
+            mt: 2,
+            background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
+            '&:hover': {
+              background: 'linear-gradient(45deg, #1ED760 30%, #1DB954 90%)',
+            },
+          }}
+        >
+          {loading ? <CircularProgress size={24} color="inherit" /> : 'Generate Playlist'}
+        </Button>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {preview && (
+        <Card sx={{ mb: 4, borderRadius: 2, overflow: 'hidden' }}>
+          <Box sx={{ p: 3, bgcolor: 'background.paper' }}>
+            <Typography variant="h5" gutterBottom>
+              {preview.name}
             </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {moods.map((mood) => (
-                <Chip
-                  key={mood}
-                  label={mood}
-                  onClick={() => handleMoodSelect(mood)}
-                  color={selectedMood === mood ? 'primary' : 'default'}
-                  sx={{ m: 0.5 }}
-                />
-              ))}
-            </Box>
-          </Box>
-
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h6" gutterBottom>
-              Select Up to 3 Genres
+            <Typography variant="body1" color="text.secondary" paragraph>
+              {preview.description}
             </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {genres.map((genre) => (
-                <Chip
-                  key={genre}
-                  label={genre}
-                  onClick={() => handleGenreSelect(genre)}
-                  color={selectedGenres.includes(genre) ? 'primary' : 'default'}
-                  sx={{ m: 0.5 }}
-                />
-              ))}
-            </Box>
-          </Box>
-
-          <Box sx={{ mb: 4 }}>
-            <TextField
-              fullWidth
-              label="Playlist Name"
-              value={playlistName}
-              onChange={(e) => setPlaylistName(e.target.value)}
-              required
-            />
-          </Box>
-
-          {error && (
-            <Box sx={{ mb: 4 }}>
-              <Alert severity="error">{error}</Alert>
-            </Box>
-          )}
-
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
             <Button
               variant="contained"
-              color="primary"
-              type="submit"
-              disabled={loading}
-              sx={{ minWidth: 200 }}
+              href={preview.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #1ED760 30%, #1DB954 90%)',
+                },
+              }}
             >
-              {loading ? <CircularProgress size={24} /> : 'Generate Playlist'}
-            </Button>
-            <Button
-              variant="outlined"
-              color="secondary"
-              onClick={logout}
-              sx={{ minWidth: 200 }}
-            >
-              Logout
+              Open in Spotify
             </Button>
           </Box>
-        </Box>
-      </Paper>
-    </Container>
-  );
-};
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Preview Tracks
+            </Typography>
+            <Grid container spacing={2}>
+              {preview.tracks.map((track, index) => (
+                <Grid item xs={12} sm={6} md={4} key={index}>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <CardMedia
+                      component="img"
+                      height="140"
+                      image={track.image}
+                      alt={track.name}
+                    />
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography gutterBottom variant="h6" component="div">
+                        {track.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {track.artist}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
 
-export default GeneratePlaylist; 
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={6000}
+        onClose={() => setOpenSnackbar(false)}
+        message="Playlist generated successfully!"
+      />
+    </Box>
+  )
+}
+
+export default GeneratePlaylist 

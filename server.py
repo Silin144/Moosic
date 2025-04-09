@@ -331,12 +331,19 @@ def generate_playlist():
 
         # Search for and add tracks to playlist
         track_uris = []
+        tracks = []
         for suggestion in song_suggestions:
             if suggestion.strip():
                 try:
                     results = sp.search(q=suggestion, type='track', limit=1)
                     if results['tracks']['items']:
-                        track_uris.append(results['tracks']['items'][0]['uri'])
+                        track = results['tracks']['items'][0]
+                        track_uris.append(track['uri'])
+                        tracks.append({
+                            'name': track['name'],
+                            'artist': track['artists'][0]['name'],
+                            'image': track['album']['images'][0]['url'] if track['album']['images'] else None
+                        })
                 except Exception as e:
                     logger.error(f"Error searching for track {suggestion}: {str(e)}")
                     continue
@@ -347,7 +354,8 @@ def generate_playlist():
         return jsonify({
             'playlist_url': playlist['external_urls']['spotify'],
             'name': name.strip(),
-            'description': description.strip()
+            'description': description.strip(),
+            'tracks': tracks
         })
 
     except Exception as e:
