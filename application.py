@@ -16,7 +16,7 @@ application = app
 
 if __name__ == '__main__':
     try:
-        port = int(os.environ.get('PORT', 5000))
+        port = int(os.environ.get('PORT', 3001))
         logger.info(f'Starting application on port {port}')
         application.run(host='0.0.0.0', port=port)
     except Exception as e:

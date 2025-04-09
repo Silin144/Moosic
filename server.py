@@ -35,7 +35,7 @@ os.environ['SPOTIFY_CLIENT_ID'] = os.getenv('SPOTIFY_CLIENT_ID')
 os.environ['SPOTIFY_CLIENT_SECRET'] = os.getenv('SPOTIFY_CLIENT_SECRET')
 os.environ['FRONTEND_URL'] = os.getenv('FRONTEND_URL')
 os.environ['BACKEND_URL'] = os.getenv('BACKEND_URL')
-os.environ['PORT'] = os.getenv('PORT', '3001')
+os.environ['PORT'] = '3001'  # Force port 3001
 os.environ['HOST'] = os.getenv('HOST', '0.0.0.0')
 
 app = Flask(__name__)
