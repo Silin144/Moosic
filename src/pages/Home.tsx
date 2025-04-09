@@ -118,37 +118,30 @@ const Home: React.FC = () => {
           </Box>
         </motion.div>
 
-        <Grid container spacing={4}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 4 }}>
           {features.map((feature, index) => (
-            <Grid 
+            <motion.div
               key={index}
-              item
-              xs={12}
-              md={4}
-              component="div"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.2 }}
             >
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.2 }}
-              >
-                <FeatureCard>
-                  <CardContent sx={{ p: 4, textAlign: 'center' }}>
-                    <Box mb={2}>
-                      {feature.icon}
-                    </Box>
-                    <Typography variant="h5" gutterBottom>
-                      {feature.title}
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                      {feature.description}
-                    </Typography>
-                  </CardContent>
-                </FeatureCard>
-              </motion.div>
-            </Grid>
+              <FeatureCard>
+                <CardContent sx={{ p: 4, textAlign: 'center' }}>
+                  <Box mb={2}>
+                    {feature.icon}
+                  </Box>
+                  <Typography variant="h5" gutterBottom>
+                    {feature.title}
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    {feature.description}
+                  </Typography>
+                </CardContent>
+              </FeatureCard>
+            </motion.div>
           ))}
-        </Grid>
+        </Box>
 
         <Box 
           mt={12} 
