@@ -122,42 +122,55 @@ def get_spotify_client():
 
 @app.route('/api/login')
 def login():
-    """Redirect to Spotify login page"""
     try:
+        # Clear any existing session data
+        session.clear()
+        logger.info("Cleared existing session data before login")
+        
         auth_url = sp_oauth.get_authorize_url()
-        logger.info(f"Generated auth URL: {auth_url}")
+        logger.info(f"Generated auth URL for new login attempt")
         return redirect(auth_url)
     except Exception as e:
         logger.error(f"Error in login: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={str(e)}")
 
 @app.route('/api/callback')
 def callback():
     try:
         code = request.args.get('code')
         if not code:
+            logger.warning("No code received in callback")
             return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=no_code")
 
+        # Clear any existing session data before setting new one
+        session.clear()
+        logger.info("Cleared existing session data in callback")
+        
         # Get token info
         token_info = sp_oauth.get_access_token(code)
         if not token_info:
+            logger.error("Failed to get access token")
             return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=token_failed")
 
         # Store token info in session
-        session.clear()  # Clear any existing session
         session['token_info'] = token_info
         session.permanent = True
 
         # Get user info to verify
         sp = spotipy.Spotify(auth=token_info['access_token'])
         user_info = sp.current_user()
-        session['user_id'] = user_info['id']  # Store user ID in session
-        session['user_info'] = user_info  # Store user info in session
+        
+        # Log the user info for debugging
+        logger.info(f"User authenticated: {user_info['id']} ({user_info['email']})")
+        logger.info(f"User display name: {user_info['display_name']}")
+        
+        session['user_id'] = user_info['id']
+        session['user_info'] = user_info
 
         return redirect(f"{os.getenv('FRONTEND_URL')}/auth?from=spotify")
     except Exception as e:
         logger.error(f"Error in callback: {str(e)}")
-        session.clear()  # Clear session on error
+        session.clear()
         return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={str(e)}")
 
 @app.route('/api/check-auth')
@@ -165,6 +178,7 @@ def check_auth():
     try:
         token_info = session.get('token_info')
         if not token_info:
+            logger.info("No token info in session during auth check")
             return jsonify({'authenticated': False})
 
         # Check if token is expired
@@ -173,8 +187,10 @@ def check_auth():
 
         if is_expired:
             try:
+                logger.info("Token expired, attempting refresh")
                 token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
                 session['token_info'] = token_info
+                logger.info("Token refreshed successfully")
             except Exception as e:
                 logger.error(f'Error refreshing token: {e}')
                 session.clear()
@@ -184,8 +200,13 @@ def check_auth():
         sp = spotipy.Spotify(auth=token_info['access_token'])
         current_user = sp.current_user()
         
+        # Log the current user for debugging
+        logger.info(f"Checking auth for user: {current_user['id']} ({current_user['email']})")
+        logger.info(f"User display name: {current_user['display_name']}")
+        
         # Verify session user matches token user
         if current_user['id'] != session.get('user_id'):
+            logger.warning(f"User ID mismatch: session={session.get('user_id')}, token={current_user['id']}")
             session.clear()
             return jsonify({'authenticated': False})
 

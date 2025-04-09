@@ -1,339 +1,208 @@
-import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { useForm, useWatch } from 'react-hook-form'
-import { z } from 'zod'
-import { zodResolver } from '@hookform/resolvers/zod'
-import MoodIcon from '../components/MoodIcon'
-import PlaylistPreview from '../components/PlaylistPreview'
+import React from 'react'
+import { useNavigate } from 'react-router-dom'
+import { 
+  Box, 
+  Container, 
+  Typography, 
+  Button, 
+  Grid, 
+  Card, 
+  CardContent,
+  useTheme
+} from '@mui/material'
+import { motion } from 'framer-motion'
+import { styled } from '@mui/material/styles'
+import { 
+  MusicNote, 
+  PlaylistPlay, 
+  AutoAwesome, 
+  Psychology 
+} from '@mui/icons-material'
+import { useAuth } from '../contexts/AuthContext'
 
-const formSchema = z.object({
-  mood: z.string().min(1, 'Please select a mood'),
-  genres: z.array(z.string()).min(1, 'Please select at least one genre'),
-  playlistName: z.string().min(1, 'Please enter a playlist name'),
-})
+const GradientText = styled(Typography)(({ theme }) => ({
+  background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  fontWeight: 'bold',
+}))
 
-type FormData = z.infer<typeof formSchema>
+const FeatureCard = styled(Card)(({ theme }) => ({
+  height: '100%',
+  background: 'rgba(255, 255, 255, 0.05)',
+  backdropFilter: 'blur(10px)',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  borderRadius: 16,
+  transition: 'transform 0.3s ease-in-out',
+  '&:hover': {
+    transform: 'translateY(-8px)',
+    boxShadow: '0 12px 24px rgba(29, 185, 84, 0.2)',
+  },
+}))
 
-const moods = ['Happy', 'Sad', 'Energetic', 'Relaxed', 'Focused']
-const genres = [
-  'Pop', 'Rock', 'Hip Hop', 'R&B', 'Jazz', 'Classical', 'Electronic',
-  'Country', 'Latin', 'Metal', 'Folk', 'Blues', 'Reggae', 'Indie'
-]
+const Home: React.FC = () => {
+  const navigate = useNavigate()
+  const { isAuthenticated } = useAuth()
+  const theme = useTheme()
 
-export default function Home() {
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([])
-  const [aiSuggestions, setAiSuggestions] = useState<any>(null)
-  const [playlistPreview, setPlaylistPreview] = useState<{
-    suggestedTracks: { name: string; artist: string; image?: string }[];
-    description: string;
-  } | null>(null)
-  
-  const { register, handleSubmit, formState: { errors }, control } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-  })
-
-  const selectedMood = useWatch({
-    control,
-    name: 'mood',
-    defaultValue: '',
-  })
-
-  const createPlaylist = useMutation({
-    mutationFn: async (data: FormData) => {
-      const response = await fetch('http://127.0.0.1:3001/api/create-playlist', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.details || 'Failed to create playlist')
-      }
-      return response.json()
+  const features = [
+    {
+      icon: <AutoAwesome sx={{ fontSize: 40, color: '#1DB954' }} />,
+      title: 'AI-Powered',
+      description: 'Our advanced AI analyzes your preferences to create the perfect playlist for any mood or occasion.'
     },
-    onSuccess: (data) => {
-      if (data.aiEnhancements) {
-        setAiSuggestions(data.aiEnhancements)
-      }
-      if (data.preview) {
-        setPlaylistPreview(data.preview)
-      }
+    {
+      icon: <MusicNote sx={{ fontSize: 40, color: '#1DB954' }} />,
+      title: 'Smart Recommendations',
+      description: 'Get personalized song suggestions based on your listening history and preferences.'
     },
-  })
-
-  const onSubmit = (data: FormData) => {
-    createPlaylist.mutate(data)
-  }
-
-  const toggleGenre = (genre: string) => {
-    setSelectedGenres(prev => 
-      prev.includes(genre)
-        ? prev.filter(g => g !== genre)
-        : [...prev, genre]
-    )
-  }
+    {
+      icon: <Psychology sx={{ fontSize: 40, color: '#1DB954' }} />,
+      title: 'Intelligent Mixing',
+      description: 'Experience seamless transitions and perfect song order for an enhanced listening experience.'
+    }
+  ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary p-8">
-      <div className="max-w-2xl mx-auto space-y-8">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-foreground">AI-Enhanced Mood Music</h1>
-          <p className="text-lg text-muted-foreground">
-            Create the perfect playlist based on your mood and music preferences, enhanced by AI
-          </p>
-        </div>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #121212 0%, #1DB954 100%)',
+        pt: 8,
+        pb: 12,
+      }}
+    >
+      <Container maxWidth="lg">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <Box textAlign="center" mb={8}>
+            <GradientText variant="h2" gutterBottom>
+              Create Your Perfect Playlist
+            </GradientText>
+            <Typography 
+              variant="h5" 
+              color="text.secondary" 
+              sx={{ mb: 4, maxWidth: 600, mx: 'auto' }}
+            >
+              Let AI craft the perfect playlist for your mood, activity, or occasion
+            </Typography>
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<PlaylistPlay />}
+                onClick={() => navigate(isAuthenticated ? '/generate' : '/auth')}
+                sx={{
+                  background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #1ED760 30%, #1DB954 90%)',
+                  },
+                  py: 2,
+                  px: 4,
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  boxShadow: '0 4px 14px 0 rgba(29, 185, 84, 0.39)'
+                }}
+              >
+                {isAuthenticated ? 'Generate Playlist' : 'Get Started'}
+              </Button>
+            </motion.div>
+          </Box>
+        </motion.div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-          {/* Mood Selection */}
-          <div className="space-y-4">
-            <label className="text-xl font-semibold">How are you feeling?</label>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {moods.map((mood) => (
-                <label
-                  key={mood}
-                  className={`
-                    flex flex-col items-center justify-center p-4 border rounded-lg cursor-pointer
-                    hover:bg-secondary/50 transition-all duration-200
-                    ${selectedMood === mood ? 'border-primary bg-primary/10 scale-105' : 'border-border'}
-                    ${errors.mood ? 'border-destructive' : ''}
-                  `}
-                >
-                  <input
-                    type="radio"
-                    value={mood}
-                    {...register('mood')}
-                    className="sr-only"
-                    data-testid={`mood-${mood.toLowerCase()}`}
-                  />
-                  <MoodIcon mood={mood} selected={selectedMood === mood} />
-                  <span className={`text-sm font-medium ${selectedMood === mood ? 'text-primary' : ''}`}>
-                    {mood}
-                  </span>
-                </label>
-              ))}
-            </div>
-            {errors.mood && (
-              <p className="text-destructive text-sm" data-testid="mood-error">{errors.mood.message}</p>
-            )}
-          </div>
+        <Grid container spacing={4}>
+          {features.map((feature, index) => (
+            <Grid 
+              key={index}
+              item
+              xs={12}
+              md={4}
+              component="div"
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.2 }}
+              >
+                <FeatureCard>
+                  <CardContent sx={{ p: 4, textAlign: 'center' }}>
+                    <Box mb={2}>
+                      {feature.icon}
+                    </Box>
+                    <Typography variant="h5" gutterBottom>
+                      {feature.title}
+                    </Typography>
+                    <Typography variant="body1" color="text.secondary">
+                      {feature.description}
+                    </Typography>
+                  </CardContent>
+                </FeatureCard>
+              </motion.div>
+            </Grid>
+          ))}
+        </Grid>
 
-          {/* Genre Selection */}
-          <div className="space-y-4">
-            <label className="text-xl font-semibold">Select your preferred genres</label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {genres.map((genre) => (
-                <label
-                  key={genre}
-                  className={`
-                    relative flex items-center justify-center p-3 border rounded-lg cursor-pointer
-                    hover:bg-secondary/50 transition-all duration-200
-                    ${selectedGenres.includes(genre) ? 'border-primary bg-primary/10 scale-105' : 'border-border'}
-                    ${errors.genres ? 'border-destructive' : ''}
-                  `}
-                >
-                  <input
-                    type="checkbox"
-                    value={genre}
-                    {...register('genres')}
-                    onChange={() => toggleGenre(genre)}
-                    className="sr-only"
-                    data-testid={`genre-${genre.toLowerCase().replace(' ', '-')}`}
-                  />
-                  {selectedGenres.includes(genre) && (
-                    <div className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-                  )}
-                  <span className={`text-sm font-medium ${selectedGenres.includes(genre) ? 'text-primary' : ''}`}>
-                    {genre}
-                  </span>
-                </label>
-              ))}
-            </div>
-            {errors.genres && (
-              <p className="text-destructive text-sm" data-testid="genres-error">{errors.genres.message}</p>
-            )}
-          </div>
-
-          {/* Playlist Name */}
-          <div className="space-y-4">
-            <label className="text-xl font-semibold">Name your playlist</label>
-            <div className="relative">
-              <input
-                type="text"
-                {...register('playlistName')}
-                className={`
-                  w-full p-4 border rounded-lg bg-background/50 backdrop-blur-sm
-                  focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200
-                  ${errors.playlistName ? 'border-destructive' : 'border-border hover:border-primary/50'}
-                `}
-                placeholder="Enter a name for your playlist"
-                data-testid="playlist-name-input"
-              />
-              {errors.playlistName && (
-                <p className="absolute -bottom-6 left-0 text-destructive text-sm" data-testid="playlist-name-error">
-                  {errors.playlistName.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={createPlaylist.isPending}
-            className={`
-              w-full py-4 px-8 rounded-lg bg-primary text-primary-foreground font-semibold
-              hover:bg-primary/90 transition-all duration-200
-              disabled:opacity-50 disabled:cursor-not-allowed
-              focus:outline-none focus:ring-2 focus:ring-primary/50
-              ${createPlaylist.isPending ? 'cursor-not-allowed' : 'cursor-pointer'}
-            `}
-            data-testid="submit-button"
+        <Box 
+          mt={12} 
+          p={4} 
+          sx={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 4,
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+        >
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
           >
-            {createPlaylist.isPending ? (
-              <span className="flex items-center justify-center space-x-2">
-                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Creating your AI-enhanced playlist...</span>
-              </span>
-            ) : (
-              'Create Your Playlist'
-            )}
-          </button>
-        </form>
-
-        {/* Results Section */}
-        <div className="space-y-6">
-          {/* Error Message */}
-          {createPlaylist.isError && (
-            <div
-              className="p-6 bg-destructive/5 border border-destructive/20 rounded-xl shadow-lg animate-fadeIn"
-              data-testid="error-message"
-            >
-              <div className="flex items-center space-x-3">
-                <svg className="w-6 h-6 text-destructive" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-destructive font-medium">{createPlaylist.error.message}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Success Message */}
-          {createPlaylist.isSuccess && (
-            <div
-              className="p-6 bg-primary/5 border border-primary/20 rounded-xl shadow-lg animate-fadeIn"
-              data-testid="success-message"
-            >
-              <div className="flex items-center space-x-3">
-                <svg className="w-6 h-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <h3 className="text-xl font-semibold">Playlist Created!</h3>
-              </div>
-              {createPlaylist.data?.playlistUrl && (
-                <a
-                  href={createPlaylist.data.playlistUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 inline-flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors"
-                  data-testid="spotify-link"
+            <Typography variant="h4" align="center" gutterBottom>
+              Ready to Experience the Future of Playlists?
+            </Typography>
+            <Typography variant="body1" align="center" color="text.secondary" sx={{ mb: 4 }}>
+              Join thousands of music lovers who are creating perfect playlists with AI
+            </Typography>
+            <Box textAlign="center">
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={() => navigate(isAuthenticated ? '/generate' : '/auth')}
+                  sx={{
+                    background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
+                    '&:hover': {
+                      background: 'linear-gradient(45deg, #1ED760 30%, #1DB954 90%)',
+                    },
+                    py: 2,
+                    px: 4,
+                    fontSize: '1.2rem',
+                    fontWeight: 'bold',
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    boxShadow: '0 4px 14px 0 rgba(29, 185, 84, 0.39)'
+                  }}
                 >
-                  <span>Open in Spotify</span>
-                  <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </a>
-              )}
-            </div>
-          )}
-
-          {/* Playlist Preview */}
-          {playlistPreview && (
-            <PlaylistPreview
-              tracks={playlistPreview.suggestedTracks}
-              description={playlistPreview.description}
-            />
-          )}
-
-          {/* AI Suggestions Display */}
-          {aiSuggestions && (
-            <div
-              className="p-6 bg-card/50 backdrop-blur-sm rounded-xl border shadow-lg space-y-4 animate-fadeIn"
-              data-testid="ai-suggestions"
-            >
-              <h3 className="text-xl font-semibold flex items-center space-x-2">
-                <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <span>AI-Enhanced Playlist Insights</span>
-              </h3>
-              <div className="space-y-3">
-                <p><span className="font-medium">Mood Analysis:</span> {aiSuggestions.adjustedMood}</p>
-                <p><span className="font-medium">Additional Genres:</span> {aiSuggestions.suggestedGenres.join(', ')}</p>
-                <div>
-                  <p className="font-medium mb-2">Audio Features:</p>
-                  <div className="grid grid-cols-3 gap-4">
-                    {Object.entries(aiSuggestions.audioFeatures).map(([key, value]) => (
-                      <div key={key} className="bg-background/50 p-3 rounded-lg text-center">
-                        <div className="text-lg font-semibold">{Math.round(Number(value) * 100)}%</div>
-                        <div className="text-xs text-muted-foreground capitalize">{key}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Success Message */}
-          {createPlaylist.isSuccess && (
-            <div
-              className="p-6 bg-primary/5 border border-primary/20 rounded-xl shadow-lg animate-fadeIn"
-              data-testid="success-message"
-            >
-              <div className="flex items-center space-x-3">
-                <svg className="w-6 h-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <h3 className="text-xl font-semibold">Playlist Created!</h3>
-              </div>
-              {createPlaylist.data?.playlistUrl && (
-                <a
-                  href={createPlaylist.data.playlistUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 inline-flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors"
-                  data-testid="spotify-link"
-                >
-                  <span>Open in Spotify</span>
-                  <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </a>
-              )}
-            </div>
-          )}
-
-          {/* Error Message */}
-          {createPlaylist.isError && (
-            <div
-              className="p-6 bg-destructive/5 border border-destructive/20 rounded-xl shadow-lg animate-fadeIn"
-              data-testid="error-message"
-            >
-              <div className="flex items-center space-x-3">
-                <svg className="w-6 h-6 text-destructive" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-destructive font-medium">{createPlaylist.error.message}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+                  {isAuthenticated ? 'Create Your Playlist' : 'Start Now'}
+                </Button>
+              </motion.div>
+            </Box>
+          </motion.div>
+        </Box>
+      </Container>
+    </Box>
   )
 }
+
+export default Home

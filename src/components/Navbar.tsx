@@ -1,23 +1,56 @@
-import React, { useState, useEffect } from 'react'
-import { AppBar, Toolbar, Typography, Button, Avatar, Box, IconButton, Menu, MenuItem } from '@mui/material'
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
+import { 
+  AppBar, 
+  Toolbar, 
+  Typography, 
+  Button, 
+  Avatar, 
+  Box, 
+  IconButton,
+  Menu,
+  MenuItem,
+  Divider
+} from '@mui/material'
 import { useAuth } from '../contexts/AuthContext'
-import { Logout as LogoutIcon, AccountCircle } from '@mui/icons-material'
+import { styled } from '@mui/material/styles'
+import { motion } from 'framer-motion'
+import { Logout, MusicNote, PlaylistPlay } from '@mui/icons-material'
+
+const GradientText = styled(Typography)(({ theme }) => ({
+  background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  fontWeight: 'bold',
+  cursor: 'pointer',
+  '&:hover': {
+    opacity: 0.8,
+  },
+}))
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate()
   const { isAuthenticated, setIsAuthenticated } = useAuth()
-  const [userInfo, setUserInfo] = useState<any>(null)
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null)
+  const [user, setUser] = React.useState<any>(null)
 
-  useEffect(() => {
+  React.useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
+          credentials: 'include',
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setUser(data)
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error)
+      }
+    }
+
     if (isAuthenticated) {
-      fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
-        credentials: 'include'
-      })
-        .then(response => response.json())
-        .then(data => setUserInfo(data))
-        .catch(error => console.error('Error fetching user info:', error))
+      fetchUser()
     }
   }, [isAuthenticated])
 
@@ -30,91 +63,150 @@ const Navbar: React.FC = () => {
   }
 
   const handleLogout = () => {
+    localStorage.removeItem('token')
     setIsAuthenticated(false)
-    localStorage.removeItem('spotify_token')
     handleClose()
     navigate('/auth')
   }
 
   return (
-    <AppBar position="static" elevation={0} sx={{ backgroundColor: 'transparent' }}>
-      <Toolbar sx={{ justifyContent: 'space-between' }}>
-        <Typography
-          variant="h6"
-          component="div"
-          sx={{
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}
-          onClick={() => navigate('/')}
+    <AppBar 
+      position="static" 
+      sx={{ 
+        background: 'rgba(18, 18, 18, 0.9)',
+        backdropFilter: 'blur(10px)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+      }}
+    >
+      <Toolbar>
+        <motion.div
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
         >
-          Moosic
-        </Typography>
+          <GradientText 
+            variant="h5" 
+            onClick={() => navigate('/')}
+            sx={{ mr: 2, cursor: 'pointer' }}
+          >
+            Moosic
+          </GradientText>
+        </motion.div>
 
-        {isAuthenticated && userInfo ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <IconButton
-              size="large"
-              onClick={handleMenu}
-              sx={{ color: 'text.primary' }}
+        <Box sx={{ flexGrow: 1 }} />
+
+        {isAuthenticated ? (
+          <>
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              {userInfo.images?.[0]?.url ? (
+              <Button
+                color="inherit"
+                startIcon={<PlaylistPlay />}
+                onClick={() => navigate('/generate')}
+                sx={{
+                  mr: 2,
+                  borderRadius: 2,
+                  '&:hover': {
+                    background: 'rgba(29, 185, 84, 0.1)',
+                  },
+                }}
+              >
+                Generate Playlist
+              </Button>
+            </motion.div>
+
+            <IconButton
+              onClick={handleMenu}
+              sx={{ p: 0 }}
+            >
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
                 <Avatar
-                  src={userInfo.images[0].url}
-                  alt={userInfo.display_name}
-                  sx={{ width: 40, height: 40 }}
+                  src={user?.images?.[0]?.url}
+                  alt={user?.display_name}
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    border: '2px solid #1DB954',
+                  }}
                 />
-              ) : (
-                <AccountCircle sx={{ width: 40, height: 40 }} />
-              )}
+              </motion.div>
             </IconButton>
+
             <Menu
               anchorEl={anchorEl}
               open={Boolean(anchorEl)}
               onClose={handleClose}
               PaperProps={{
-                elevation: 0,
                 sx: {
-                  overflow: 'visible',
-                  filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
                   mt: 1.5,
-                  '& .MuiAvatar-root': {
-                    width: 32,
-                    height: 32,
-                    ml: -0.5,
-                    mr: 1,
-                  },
+                  background: 'rgba(18, 18, 18, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: 2,
                 },
               }}
             >
-              <MenuItem onClick={handleClose}>
-                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                  {userInfo.display_name}
-                </Typography>
+              <MenuItem 
+                onClick={() => {
+                  handleClose()
+                  navigate('/profile')
+                }}
+                sx={{
+                  '&:hover': {
+                    background: 'rgba(29, 185, 84, 0.1)',
+                  },
+                }}
+              >
+                <Avatar 
+                  src={user?.images?.[0]?.url} 
+                  sx={{ width: 32, height: 32, mr: 2 }}
+                />
+                <Box>
+                  <Typography variant="body1">
+                    {user?.display_name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {user?.email}
+                  </Typography>
+                </Box>
               </MenuItem>
-              <MenuItem onClick={handleLogout}>
-                <LogoutIcon sx={{ mr: 1 }} />
+              <Divider sx={{ my: 1, opacity: 0.1 }} />
+              <MenuItem 
+                onClick={handleLogout}
+                sx={{
+                  color: 'error.main',
+                  '&:hover': {
+                    background: 'rgba(211, 47, 47, 0.1)',
+                  },
+                }}
+              >
+                <Logout sx={{ mr: 2 }} />
                 Logout
               </MenuItem>
             </Menu>
-          </Box>
+          </>
         ) : (
-          <Button
-            variant="contained"
-            onClick={() => navigate('/auth')}
-            sx={{
-              background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
-              color: 'white',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #1ED760 30%, #1DB954 90%)',
-              },
-            }}
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            Login
-          </Button>
+            <Button
+              color="inherit"
+              onClick={() => navigate('/auth')}
+              sx={{
+                borderRadius: 2,
+                '&:hover': {
+                  background: 'rgba(29, 185, 84, 0.1)',
+                },
+              }}
+            >
+              Login
+            </Button>
+          </motion.div>
         )}
       </Toolbar>
     </AppBar>
