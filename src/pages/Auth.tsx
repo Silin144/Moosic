@@ -14,31 +14,32 @@ const Auth: React.FC = () => {
     const code = searchParams.get('code')
     const error = searchParams.get('error')
 
-    console.log('Auth params:', { code, error }) // Debug log
+    console.log('Auth component mounted with params:', { code, error })
 
     if (error) {
-      console.error('Auth error:', error) // Debug log
+      console.error('Auth error:', error)
       setError(error === 'access_denied' ? 'Login was cancelled' : error)
       setLoading(false)
       return
     }
 
     if (code === 'success') {
-      console.log('Auth success, logging in...') // Debug log
+      console.log('Auth success, logging in...')
       login()
-      // Use setTimeout to ensure state updates before navigation
+      // Use a small delay to ensure state updates before navigation
       setTimeout(() => {
+        console.log('Navigating to home...')
         navigate('/', { replace: true })
-      }, 0)
+      }, 100)
     }
   }, [searchParams, navigate, login])
 
   const handleLogin = () => {
-    console.log('Initiating login...') // Debug log
+    console.log('Initiating login...')
     setLoading(true)
     setError(null)
     const loginUrl = `${import.meta.env.VITE_API_URL}/api/login`
-    console.log('Login URL:', loginUrl) // Debug log
+    console.log('Login URL:', loginUrl)
     window.location.href = loginUrl
   }
 

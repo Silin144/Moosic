@@ -129,6 +129,10 @@ def login():
 def callback():
     """Handle Spotify OAuth callback"""
     try:
+        logger.info("Received callback request")
+        logger.info(f"Request args: {request.args}")
+        logger.info(f"Request headers: {dict(request.headers)}")
+
         code = request.args.get('code')
         if not code:
             error = request.args.get('error')
@@ -136,6 +140,7 @@ def callback():
             return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={error}")
 
         # Exchange the code for an access token
+        logger.info("Attempting to exchange code for token")
         token_info = sp_oauth.get_access_token(code)
         if not token_info:
             logger.error("Failed to get access token")
@@ -147,11 +152,12 @@ def callback():
 
         # Redirect to frontend with success
         frontend_url = os.getenv('FRONTEND_URL')
-        logger.info(f"Redirecting to frontend: {frontend_url}/auth?code=success")
-        return redirect(f"{frontend_url}/auth?code=success")
+        redirect_url = f"{frontend_url}/auth?code=success"
+        logger.info(f"Redirecting to: {redirect_url}")
+        return redirect(redirect_url)
 
     except Exception as e:
-        logger.error(f"Error in callback: {str(e)}")
+        logger.error(f"Error in callback: {str(e)}", exc_info=True)
         return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={str(e)}")
 
 @app.route('/api/check-auth')
