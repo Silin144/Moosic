@@ -125,27 +125,28 @@ def login():
 
 @app.route('/api/callback')
 def callback():
+    """Handle Spotify OAuth callback"""
     try:
         code = request.args.get('code')
         if not code:
-            return jsonify({'error': 'No code provided'}), 400
+            error = request.args.get('error')
+            logger.error(f"Callback error: {error}")
+            return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={error}")
 
         # Exchange the code for an access token
         token_info = sp_oauth.get_access_token(code)
         if not token_info:
-            return jsonify({'error': 'Failed to get access token'}), 400
+            return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=Failed to get access token")
 
         # Store the token info in the session
         session['token_info'] = token_info
 
-        # Redirect to the frontend with success
-        frontend_url = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app')
-        return redirect(f"{frontend_url}/auth?code=success&from=spotify")
+        # Redirect to frontend with success
+        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?code=success")
 
     except Exception as e:
-        print(f"Error in callback: {str(e)}")
-        frontend_url = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app')
-        return redirect(f"{frontend_url}/auth?error={str(e)}")
+        logger.error(f"Error in callback: {str(e)}")
+        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={str(e)}")
 
 @app.route('/api/check-auth')
 def check_auth():

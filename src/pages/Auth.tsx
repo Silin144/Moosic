@@ -15,21 +15,21 @@ const Auth: React.FC = () => {
     const error = searchParams.get('error')
 
     if (error) {
-      setError(error)
+      setError(error === 'access_denied' ? 'Login was cancelled' : error)
       setLoading(false)
       return
     }
 
     if (code === 'success') {
       login()
-      navigate('/')
+      navigate('/', { replace: true })
     }
   }, [searchParams, navigate, login])
 
   const handleLogin = () => {
     setLoading(true)
     setError(null)
-    window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
+    window.location.replace(`${import.meta.env.VITE_API_URL}/api/login`)
   }
 
   return (
