@@ -11,6 +11,7 @@ import openai
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from playlist_generator import PlaylistGenerator
+import requests
 
 # Load environment variables
 load_dotenv()
@@ -46,7 +47,7 @@ ssl_context = (
 )
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # Required for session handling
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
 
 # Configure CORS
 CORS(app, resources={
@@ -75,15 +76,12 @@ is_production = os.getenv('ENVIRONMENT') == 'production'
 app.config['PREFERRED_URL_SCHEME'] = 'https'
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
 
 # Configure logging
 import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize Spotify OAuth with state parameter
@@ -91,9 +89,7 @@ sp_oauth = SpotifyOAuth(
     client_id=os.getenv('SPOTIFY_CLIENT_ID'),
     client_secret=os.getenv('SPOTIFY_CLIENT_SECRET'),
     redirect_uri=os.getenv('SPOTIFY_REDIRECT_URI'),
-    scope='playlist-modify-public playlist-modify-private user-read-private user-read-email',
-    show_dialog=True,
-    cache_path=None  # Disable token caching for Render
+    scope='playlist-modify-public playlist-modify-private user-read-private user-read-email'
 )
 
 def get_spotify_client():
@@ -119,7 +115,7 @@ def login():
     """Redirect to Spotify login page"""
     try:
         auth_url = sp_oauth.get_authorize_url()
-        logger.info(f"Redirecting to Spotify auth URL: {auth_url}")
+        logger.info(f"Generated auth URL: {auth_url}")
         return redirect(auth_url)
     except Exception as e:
         logger.error(f"Error in login: {str(e)}")
@@ -135,9 +131,8 @@ def callback():
 
         code = request.args.get('code')
         if not code:
-            error = request.args.get('error')
-            logger.error(f"Callback error: {error}")
-            return jsonify({'error': error}), 400
+            logger.error("No code received in callback")
+            return jsonify({'error': 'No code received'}), 400
 
         # Exchange the code for an access token
         logger.info("Attempting to exchange code for token")
@@ -148,14 +143,11 @@ def callback():
 
         # Store the token info in the session
         session['token_info'] = token_info
-        logger.info("Successfully stored token info in session")
+        logger.info("Successfully obtained token info")
 
-        # Return the access token to the frontend
-        return jsonify({
-            'access_token': token_info['access_token'],
-            'expires_in': token_info['expires_in'],
-            'refresh_token': token_info['refresh_token']
-        })
+        # Redirect to frontend with success
+        frontend_url = os.getenv('FRONTEND_URL', 'https://moosic.vercel.app')
+        return redirect(f"{frontend_url}/auth?from=spotify")
 
     except Exception as e:
         logger.error(f"Error in callback: {str(e)}", exc_info=True)
@@ -301,29 +293,73 @@ def generate_playlist():
     try:
         data = request.json
         prompt = data.get('prompt')
-        length = data.get('length', 10)
-        name = data.get('name')
-        interactive = data.get('interactive', False)
-        
         if not prompt:
-            return jsonify({'error': 'Prompt is required'}), 400
-            
-        generator = PlaylistGenerator(
-            prompt=prompt,
-            length=length,
-            name=name,
-            interactive=interactive
+            return jsonify({'error': 'No prompt provided'}), 400
+
+        # Get token from session
+        token_info = session.get('token_info')
+        if not token_info:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        # Initialize Spotify client
+        sp = spotipy.Spotify(auth=token_info['access_token'])
+
+        # Get user's Spotify ID
+        user_info = sp.current_user()
+        user_id = user_info['id']
+
+        # Generate playlist name and description using OpenAI
+        completion = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that generates creative playlist names and descriptions."},
+                {"role": "user", "content": f"Generate a creative name and description for a playlist based on this prompt: {prompt}"}
+            ]
         )
-        
-        playlist_id = generator.generate_playlist()
+        response = completion.choices[0].message.content
+        name, description = response.split('\n', 1)
+
+        # Create playlist
+        playlist = sp.user_playlist_create(
+            user_id,
+            name.strip(),
+            public=True,
+            description=description.strip()
+        )
+
+        # Search for songs based on the prompt
+        completion = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that suggests songs based on user prompts. Return only song names and artists in the format 'Song Name - Artist Name', one per line."},
+                {"role": "user", "content": f"Suggest 10 songs for a playlist based on this prompt: {prompt}"}
+            ]
+        )
+        song_suggestions = completion.choices[0].message.content.split('\n')
+
+        # Search for and add tracks to playlist
+        track_uris = []
+        for suggestion in song_suggestions:
+            if suggestion.strip():
+                try:
+                    results = sp.search(q=suggestion, type='track', limit=1)
+                    if results['tracks']['items']:
+                        track_uris.append(results['tracks']['items'][0]['uri'])
+                except Exception as e:
+                    logger.error(f"Error searching for track {suggestion}: {str(e)}")
+                    continue
+
+        if track_uris:
+            sp.playlist_add_items(playlist['id'], track_uris)
+
         return jsonify({
-            'success': True,
-            'playlist_id': playlist_id,
-            'message': 'Playlist generated successfully'
+            'playlist_url': playlist['external_urls']['spotify'],
+            'name': name.strip(),
+            'description': description.strip()
         })
-        
+
     except Exception as e:
-        logger.error(f'Error generating playlist: {e}')
+        logger.error(f"Error in generate-playlist: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 def retry_with_backoff(func, max_retries=3, initial_delay=1):
@@ -343,6 +379,5 @@ def retry_with_backoff(func, max_retries=3, initial_delay=1):
     raise last_exception
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 10000))  # Render uses port 10000 by default
-    host = '0.0.0.0'  # Listen on all interfaces
-    app.run(host=host, port=port) 
+    port = int(os.getenv('PORT', 10000))
+    app.run(host='0.0.0.0', port=port) 

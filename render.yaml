@@ -16,7 +16,9 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: FRONTEND_URL
-        sync: false
+        value: https://moosic.vercel.app
+      - key: FLASK_SECRET_KEY
+        generateValue: true
       - key: BACKEND_URL
         sync: false
       - key: ENVIRONMENT
