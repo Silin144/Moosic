@@ -14,7 +14,9 @@ BACKEND_URL = os.getenv('BACKEND_URL', 'https://moosic-liart.vercel.app' if IS_P
 # Spotify Configuration
 SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
 SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
-SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', f'{BACKEND_URL}/api/callback')
+# Use frontend URL for callback in production, backend URL in development
+SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', 
+    f'{FRONTEND_URL}/api/callback' if IS_PRODUCTION else f'{BACKEND_URL}/api/callback')
 
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
