@@ -331,6 +331,6 @@ def retry_with_backoff(func, max_retries=3, initial_delay=1):
     raise last_exception
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 10000))
-    host = os.getenv('HOST', '0.0.0.0')
-    app.run(host=host, port=port, debug=False) 
+    port = int(os.getenv('PORT', 10000))  # Render uses port 10000 by default
+    host = '0.0.0.0'  # Listen on all interfaces
+    app.run(host=host, port=port) 

@@ -34,6 +34,7 @@ const AppContent = () => {
             )
           }
         />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   )
