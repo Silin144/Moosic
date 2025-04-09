@@ -10,6 +10,7 @@ from spotipy.oauth2 import SpotifyOAuth
 import openai
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+from playlist_generator import PlaylistGenerator
 
 # Load environment variables
 load_dotenv()
@@ -37,6 +38,12 @@ os.environ['FRONTEND_URL'] = os.getenv('FRONTEND_URL')
 os.environ['BACKEND_URL'] = os.getenv('BACKEND_URL')
 os.environ['PORT'] = '3001'  # Force port 3001
 os.environ['HOST'] = os.getenv('HOST', '0.0.0.0')
+
+# SSL certificate paths
+ssl_context = (
+    '/opt/moosic/ssl/fullchain.pem',  # Certificate path
+    '/opt/moosic/ssl/privkey.pem'     # Private key path
+)
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Required for session handling
@@ -276,6 +283,36 @@ def create_playlist():
         logger.error(f'Error creating playlist: {e}')
         return jsonify({'error': 'Failed to create playlist', 'details': str(e)}), 500
 
+@app.route('/api/generate-playlist', methods=['POST'])
+def generate_playlist():
+    try:
+        data = request.json
+        prompt = data.get('prompt')
+        length = data.get('length', 10)
+        name = data.get('name')
+        interactive = data.get('interactive', False)
+        
+        if not prompt:
+            return jsonify({'error': 'Prompt is required'}), 400
+            
+        generator = PlaylistGenerator(
+            prompt=prompt,
+            length=length,
+            name=name,
+            interactive=interactive
+        )
+        
+        playlist_id = generator.generate_playlist()
+        return jsonify({
+            'success': True,
+            'playlist_id': playlist_id,
+            'message': 'Playlist generated successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f'Error generating playlist: {e}')
+        return jsonify({'error': str(e)}), 500
+
 def retry_with_backoff(func, max_retries=3, initial_delay=1):
     """Retry a function with exponential backoff"""
     delay = initial_delay
@@ -293,6 +330,8 @@ def retry_with_backoff(func, max_retries=3, initial_delay=1):
     raise last_exception
 
 if __name__ == '__main__':
-    host = os.getenv('HOST', '0.0.0.0')
-    port = int(os.getenv('PORT', '3001'))
-    app.run(host=host, port=port) 
+    app.run(
+        host=os.getenv('HOST', '0.0.0.0'),
+        port=int(os.getenv('PORT', 3001)),
+        ssl_context=ssl_context
+    ) 
