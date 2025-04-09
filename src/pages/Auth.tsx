@@ -13,23 +13,24 @@ const Auth: React.FC = () => {
   useEffect(() => {
     const code = searchParams.get('code')
     const error = searchParams.get('error')
+    const from = searchParams.get('from')
 
     if (error) {
-      setError(error === 'access_denied' ? 'Login was cancelled' : error)
+      setError(error)
       setLoading(false)
       return
     }
 
-    if (code === 'success') {
-      login()
+    if (code && from === 'spotify') {
+      login(code)
       navigate('/')
     }
-  }, [searchParams, login, navigate])
+  }, [searchParams, navigate, login])
 
   const handleLogin = () => {
     setLoading(true)
     setError(null)
-    window.location.replace(`${import.meta.env.VITE_API_URL}/api/login`)
+    window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
   }
 
   if (loading) {

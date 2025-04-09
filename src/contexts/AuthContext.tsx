@@ -2,13 +2,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  login: () => void;
+  login: (code: string) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
@@ -28,19 +28,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuth();
   }, []);
 
-  const login = () => {
-    setIsAuthenticated(true);
+  const login = async (code: string) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/callback?code=${code}`);
+      if (response.ok) {
+        setIsAuthenticated(true);
+      } else {
+        throw new Error('Failed to authenticate');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
-  const logout = async () => {
-    try {
-      await fetch(`${import.meta.env.VITE_API_URL}/api/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
+  const logout = () => {
     setIsAuthenticated(false);
   };
 
