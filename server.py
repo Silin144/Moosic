@@ -72,10 +72,10 @@ def after_request(response):
 
 # Configure for environment
 is_production = os.getenv('ENVIRONMENT') == 'production'
-app.config['PREFERRED_URL_SCHEME'] = 'https' if is_production else 'http'
-app.config['SESSION_COOKIE_SECURE'] = is_production
+app.config['PREFERRED_URL_SCHEME'] = 'http'  # Use HTTP since ngrok handles HTTPS
+app.config['SESSION_COOKIE_SECURE'] = False  # Allow non-HTTPS cookies
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax' if is_production else None
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Configure logging
 import logging
@@ -85,7 +85,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize Spotify OAuth
+# Initialize Spotify OAuth with state parameter
 sp_oauth = SpotifyOAuth(
     client_id=os.getenv('SPOTIFY_CLIENT_ID'),
     client_secret=os.getenv('SPOTIFY_CLIENT_SECRET'),
@@ -114,6 +114,7 @@ def get_spotify_client():
 
 @app.route('/api/login')
 def login():
+    """Redirect to Spotify login page"""
     try:
         auth_url = sp_oauth.get_authorize_url()
         logger.info(f"Redirecting to Spotify auth URL: {auth_url}")
@@ -124,29 +125,22 @@ def login():
 
 @app.route('/api/callback')
 def callback():
+    """Handle Spotify OAuth callback"""
     try:
         code = request.args.get('code')
-        state = request.args.get('state')
-        
         if not code:
-            logger.error('No code received in callback')
-            return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=no_code")
-            
+            error = request.args.get('error')
+            logger.error(f"Callback error: {error}")
+            return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={error}")
+
         token_info = sp_oauth.get_access_token(code)
-        if not token_info:
-            logger.error('Failed to get access token')
-            return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=token_failed")
-        
-        # Add expiration time to token info
-        token_info['expires_at'] = int(time.time()) + token_info['expires_in']
         session['token_info'] = token_info
         
-        logger.info('Successfully authenticated with Spotify')
-        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?from=spotify")
-        
+        # Redirect to frontend with success
+        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?code=success")
     except Exception as e:
-        logger.error(f'Error in callback: {str(e)}')
-        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=callback_failed")
+        logger.error(f"Error in callback: {str(e)}")
+        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={str(e)}")
 
 @app.route('/api/check-auth')
 def check_auth():
@@ -330,8 +324,6 @@ def retry_with_backoff(func, max_retries=3, initial_delay=1):
     raise last_exception
 
 if __name__ == '__main__':
-    app.run(
-        host=os.getenv('HOST', '0.0.0.0'),
-        port=int(os.getenv('PORT', 3001)),
-        ssl_context=ssl_context
-    ) 
+    port = int(os.getenv('PORT', 3001))
+    host = os.getenv('HOST', '0.0.0.0')
+    app.run(host=host, port=port, debug=False)  # Remove SSL context 
