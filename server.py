@@ -57,6 +57,7 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
+app.config['SESSION_COOKIE_NAME'] = 'moosic_session'  # Unique session cookie name
 
 # Initialize Flask-Session
 Session(app)
@@ -134,24 +135,27 @@ def callback():
     try:
         code = request.args.get('code')
         if not code:
-            logger.error("No code received in callback")
-            return jsonify({'error': 'No code received'}), 400
+            return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=no_code")
 
+        # Get token info
         token_info = sp_oauth.get_access_token(code)
         if not token_info:
-            logger.error("Failed to get access token")
-            return jsonify({'error': 'Failed to get access token'}), 400
+            return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=token_failed")
 
+        # Store token info in session
+        session.clear()  # Clear any existing session
         session['token_info'] = token_info
-        logger.info("Successfully obtained token info")
+        session.permanent = True
 
-        # Redirect to frontend with success
-        frontend_url = os.getenv('FRONTEND_URL', 'https://moosic.vercel.app')
-        return redirect(f"{frontend_url}/auth?from=spotify")
+        # Get user info to verify
+        sp = spotipy.Spotify(auth=token_info['access_token'])
+        user_info = sp.current_user()
+        session['user_id'] = user_info['id']  # Store user ID in session
 
+        return redirect(f"{os.getenv('FRONTEND_URL')}?from=spotify")
     except Exception as e:
         logger.error(f"Error in callback: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={str(e)}")
 
 @app.route('/api/check-auth')
 def check_auth():
@@ -300,6 +304,13 @@ def generate_playlist():
         token_info = session.get('token_info')
         if not token_info:
             return jsonify({'error': 'Not authenticated'}), 401
+
+        # Verify the session user matches the token
+        sp = spotipy.Spotify(auth=token_info['access_token'])
+        current_user = sp.current_user()
+        if current_user['id'] != session.get('user_id'):
+            session.clear()  # Clear session if user mismatch
+            return jsonify({'error': 'Session mismatch'}), 401
 
         # Initialize Spotify client
         sp = spotipy.Spotify(auth=token_info['access_token'])
