@@ -28,8 +28,8 @@ export default function Auth() {
   const handleLogin = () => {
     setIsLoading(true)
     setError(null)
-    // Use the backend URL directly for the login
-    window.location.href = 'http://3.148.173.124:3001/api/login'
+    // Use the frontend's proxy
+    window.location.href = '/api/login'
   }
 
   if (isLoading) {

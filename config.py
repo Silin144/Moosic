@@ -9,14 +9,13 @@ IS_PRODUCTION = os.getenv('VERCEL_ENV') == 'production'
 
 # URLs
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app' if IS_PRODUCTION else 'http://localhost:5173')
-BACKEND_URL = os.getenv('BACKEND_URL', 'http://ec2-3-146-249-79.us-east-2.compute.amazonaws.com:3001' if IS_PRODUCTION else 'http://localhost:3001')
+BACKEND_URL = os.getenv('BACKEND_URL', 'http://3.148.173.124:3001' if IS_PRODUCTION else 'http://localhost:3001')
 
 # Spotify Configuration
 SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
 SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
-# Use frontend URL for callback in production, backend URL in development
-SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', 
-    f'{FRONTEND_URL}/api/callback' if IS_PRODUCTION else f'{BACKEND_URL}/api/callback')
+# Use backend URL for callback
+SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', f'{BACKEND_URL}/api/callback')
 
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
