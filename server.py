@@ -51,9 +51,9 @@ app.secret_key = os.urandom(24)  # Required for session handling
 # Configure CORS
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["https://moosic-liart.vercel.app"],  # Only allow the production frontend
+        "origins": [os.getenv('FRONTEND_URL')],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "Origin", "Accept"],
+        "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True,
         "expose_headers": ["Content-Type", "Authorization"],
         "allow_credentials": True,
@@ -64,7 +64,7 @@ CORS(app, resources={
 # Add error handler for CORS
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'https://moosic-liart.vercel.app')
+    response.headers.add('Access-Control-Allow-Origin', os.getenv('FRONTEND_URL'))
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
@@ -76,6 +76,7 @@ app.config['PREFERRED_URL_SCHEME'] = 'https'
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
 
 # Configure logging
 import logging
