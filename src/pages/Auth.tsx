@@ -28,8 +28,22 @@ export default function Auth() {
   const handleLogin = () => {
     setIsLoading(true)
     setError(null)
-    // Use window.location.replace() to prevent page reload
-    window.location.replace(`${import.meta.env.VITE_API_URL}/api/login`)
+    // Use a proper redirect with error handling
+    fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
+      method: 'GET',
+      redirect: 'follow',
+    })
+    .then(response => {
+      if (response.redirected) {
+        window.location.href = response.url
+      } else {
+        throw new Error('Failed to get redirect URL')
+      }
+    })
+    .catch(err => {
+      setError(err.message)
+      setIsLoading(false)
+    })
   }
 
   if (isLoading) {
