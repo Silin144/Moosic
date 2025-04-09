@@ -29,7 +29,7 @@ const Auth: React.FC = () => {
   const handleLogin = () => {
     setLoading(true)
     setError(null)
-    window.location.replace(`${process.env.REACT_APP_API_URL}/api/login`)
+    window.location.replace(`${import.meta.env.VITE_API_URL}/api/login`)
   }
 
   if (loading) {
