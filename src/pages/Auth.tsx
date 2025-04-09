@@ -9,49 +9,26 @@ export default function Auth() {
 
   useEffect(() => {
     const code = searchParams.get('code')
-    const state = searchParams.get('state')
+    const error = searchParams.get('error')
     const from = searchParams.get('from')
 
-    if (code && state && from === 'spotify') {
-      setIsLoading(true)
-      // Use the frontend's proxy
-      fetch('/api/callback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code, state }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) {
-            setError(data.error)
-          } else {
-            navigate('/')
-          }
-        })
-        .catch(err => {
-          setError(err.message)
-        })
-        .finally(() => {
-          setIsLoading(false)
-        })
+    if (error) {
+      setError(error)
+      setIsLoading(false)
+      return
+    }
+
+    if (from === 'spotify') {
+      // We've been redirected back from Spotify
+      setIsLoading(false)
+      navigate('/')
     }
   }, [searchParams, navigate])
 
   const handleLogin = () => {
     setIsLoading(true)
     setError(null)
-
-    // Only open the login window if we're not already in the process
-    if (!searchParams.has('from')) {
-      // Use the frontend's proxy
-      const loginWindow = window.open('/api/login', 'Spotify Login', 'width=800,height=600')
-      if (!loginWindow) {
-        setError('Popup was blocked. Please allow popups for this site.')
-        setIsLoading(false)
-      }
-    }
+    window.location.href = '/api/login'
   }
 
   if (isLoading) {
