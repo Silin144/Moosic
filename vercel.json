@@ -31,16 +31,27 @@
       "dest": "/application.py"
     },
     {
+      "src": "/api/logout",
+      "dest": "/application.py"
+    },
+    {
+      "src": "/api/me",
+      "dest": "/application.py"
+    },
+    {
+      "src": "/api/create-playlist",
+      "dest": "/application.py"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/application.py"
     },
     {
-      "src": "/auth",
-      "dest": "/dist/index.html"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/dist/$1"
+      "dest": "/dist/index.html",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
     }
   ],
   "env": {

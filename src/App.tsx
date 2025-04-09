@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Home from './pages/Home'
 import Auth from './pages/Auth'
 import Header from './components/Header'
@@ -8,9 +8,10 @@ import './index.css'
 
 const queryClient = new QueryClient()
 
-function App() {
+function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
   const [isLoading, setIsLoading] = useState(true)
+  const location = useLocation()
 
   const checkAuth = async () => {
     try {
@@ -34,19 +35,10 @@ function App() {
 
   // Check auth when returning from Spotify or when the URL changes
   useEffect(() => {
-    const handleAuthCheck = () => {
-      if (window.location.pathname === '/auth' || window.location.search.includes('from=spotify')) {
-        checkAuth()
-      }
+    if (location.pathname === '/auth' || location.search.includes('from=spotify')) {
+      checkAuth()
     }
-
-    // Check immediately
-    handleAuthCheck()
-
-    // Listen for URL changes
-    window.addEventListener('popstate', handleAuthCheck)
-    return () => window.removeEventListener('popstate', handleAuthCheck)
-  }, [])
+  }, [location])
 
   if (isLoading) {
     return (
@@ -65,32 +57,42 @@ function App() {
     </div>
   )
 
-  const router = createBrowserRouter([
-    {
-      path: '/',
-      element: isAuthenticated ? (
-        <Layout>
-          <Home />
-        </Layout>
-      ) : (
-        <Navigate to="/auth" replace />
-      ),
-    },
-    {
-      path: '/auth',
-      element: isAuthenticated ? (
-        <Navigate to="/" replace />
-      ) : (
-        <Layout>
-          <Auth />
-        </Layout>
-      ),
-    },
-  ])
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <Home />
+            </Layout>
+          ) : (
+            <Navigate to="/auth" replace />
+          )
+        }
+      />
+      <Route
+        path="/auth"
+        element={
+          isAuthenticated ? (
+            <Navigate to="/" replace />
+          ) : (
+            <Layout>
+              <Auth />
+            </Layout>
+          )
+        }
+      />
+    </Routes>
+  )
+}
 
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
     </QueryClientProvider>
   )
 }
