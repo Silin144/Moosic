@@ -92,7 +92,8 @@ sp_oauth = SpotifyOAuth(
     client_secret=os.getenv('SPOTIFY_CLIENT_SECRET'),
     redirect_uri=os.getenv('SPOTIFY_REDIRECT_URI'),
     scope='playlist-modify-public playlist-modify-private user-read-private user-read-email',
-    show_dialog=True
+    show_dialog=True,
+    cache_path=None  # Disable token caching for Render
 )
 
 def get_spotify_client():
@@ -137,13 +138,17 @@ def callback():
         # Exchange the code for an access token
         token_info = sp_oauth.get_access_token(code)
         if not token_info:
+            logger.error("Failed to get access token")
             return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=Failed to get access token")
 
         # Store the token info in the session
         session['token_info'] = token_info
+        logger.info("Successfully stored token info in session")
 
         # Redirect to frontend with success
-        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?code=success")
+        frontend_url = os.getenv('FRONTEND_URL')
+        logger.info(f"Redirecting to frontend: {frontend_url}/auth?code=success")
+        return redirect(f"{frontend_url}/auth?code=success")
 
     except Exception as e:
         logger.error(f"Error in callback: {str(e)}")
