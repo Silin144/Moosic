@@ -1,8 +1,21 @@
 import os
 from dotenv import load_dotenv
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
-load_dotenv()
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+logger.debug(f"Loading .env file from: {env_path}")
+load_dotenv(env_path)
+
+# Log all environment variables (except sensitive ones)
+logger.debug("Environment variables:")
+for key, value in os.environ.items():
+    if key not in ['SPOTIFY_CLIENT_SECRET', 'OPENAI_API_KEY']:
+        logger.debug(f"{key}: {value}")
 
 # Environment
 IS_PRODUCTION = os.getenv('VERCEL_ENV') == 'production'
@@ -37,4 +50,5 @@ required_vars = [
 
 missing_vars = [var for var in required_vars if not os.getenv(var)]
 if missing_vars:
+    logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
     raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
