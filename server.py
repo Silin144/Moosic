@@ -160,29 +160,36 @@ def callback():
 @app.route('/api/check-auth')
 def check_auth():
     try:
-        token_info = session.get('token_info', None)
+        token_info = session.get('token_info')
         if not token_info:
             return jsonify({'authenticated': False})
-        
+
         # Check if token is expired
         now = int(time.time())
         is_expired = token_info['expires_at'] - now < 60
-        
+
         if is_expired:
             try:
                 token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-                token_info['expires_at'] = int(time.time()) + token_info['expires_in']
                 session['token_info'] = token_info
             except Exception as e:
                 logger.error(f'Error refreshing token: {e}')
+                session.clear()
                 return jsonify({'authenticated': False})
-        
-        # Verify token is valid by making a simple API call
+
+        # Verify token is valid
         sp = spotipy.Spotify(auth=token_info['access_token'])
-        sp.current_user()
+        current_user = sp.current_user()
+        
+        # Verify session user matches token user
+        if current_user['id'] != session.get('user_id'):
+            session.clear()
+            return jsonify({'authenticated': False})
+
         return jsonify({'authenticated': True})
     except Exception as e:
-        logger.error(f'Auth check error: {e}')
+        logger.error(f'Error checking auth: {e}')
+        session.clear()
         return jsonify({'authenticated': False})
 
 @app.route('/api/me')
