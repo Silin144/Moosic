@@ -150,9 +150,9 @@ def callback():
         session['token_info'] = token_info
         logger.info("Successfully stored token info in session")
 
-        # Redirect to frontend with success
+        # Redirect to frontend with success and from=spotify parameter
         frontend_url = os.getenv('FRONTEND_URL')
-        redirect_url = f"{frontend_url}/auth?code=success"
+        redirect_url = f"{frontend_url}/auth?code={code}&from=spotify"
         logger.info(f"Redirecting to: {redirect_url}")
         return redirect(redirect_url)
 

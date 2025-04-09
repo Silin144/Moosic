@@ -12,7 +12,7 @@ const Auth: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/')
+      navigate('/', { replace: true })
       return
     }
 
