@@ -19,11 +19,24 @@
   ],
   "routes": [
     {
+      "src": "/api/login",
+      "dest": "/application.py"
+    },
+    {
+      "src": "/api/check-auth",
+      "dest": "/application.py"
+    },
+    {
+      "src": "/api/callback",
+      "dest": "/application.py"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/application.py"
     },
     {
-      "handle": "filesystem"
+      "src": "/auth",
+      "dest": "/dist/index.html"
     },
     {
       "src": "/(.*)",

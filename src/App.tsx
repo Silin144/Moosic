@@ -15,9 +15,13 @@ function App() {
   const checkAuth = async () => {
     try {
       const res = await fetch('/api/check-auth')
+      if (!res.ok) {
+        throw new Error('Authentication check failed')
+      }
       const data = await res.json()
       setIsAuthenticated(data.authenticated)
     } catch (error) {
+      console.error('Auth check error:', error)
       setIsAuthenticated(false)
     } finally {
       setIsLoading(false)
@@ -28,12 +32,21 @@ function App() {
     checkAuth()
   }, [])
 
-  // Also check auth when returning from Spotify
+  // Check auth when returning from Spotify or when the URL changes
   useEffect(() => {
-    if (window.location.pathname === '/auth' && window.location.search.includes('from=spotify')) {
-      checkAuth()
+    const handleAuthCheck = () => {
+      if (window.location.pathname === '/auth' || window.location.search.includes('from=spotify')) {
+        checkAuth()
+      }
     }
-  }, [window.location.search])
+
+    // Check immediately
+    handleAuthCheck()
+
+    // Listen for URL changes
+    window.addEventListener('popstate', handleAuthCheck)
+    return () => window.removeEventListener('popstate', handleAuthCheck)
+  }, [])
 
   if (isLoading) {
     return (
@@ -60,13 +73,13 @@ function App() {
           <Home />
         </Layout>
       ) : (
-        <Navigate to="/auth" />
+        <Navigate to="/auth" replace />
       ),
     },
     {
       path: '/auth',
       element: isAuthenticated ? (
-        <Navigate to="/" />
+        <Navigate to="/" replace />
       ) : (
         <Layout>
           <Auth />

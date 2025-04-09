@@ -1,1 +1,1 @@
-web: gunicorn --bind 0.0.0.0:5000 application:app
+web: gunicorn --bind 0.0.0.0:5000 --error-logfile /var/log/web.stderr.log --access-logfile /var/log/web.stdout.log --capture-output application:application
