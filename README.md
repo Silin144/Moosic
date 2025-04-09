@@ -87,33 +87,74 @@ npm install -g vercel
 vercel
 ```
 
-### Backend Deployment (Heroku)
+### Backend Deployment (AWS EC2)
 
-1. Create Procfile:
-```
-web: gunicorn server:app
-```
+1. Launch an EC2 instance:
+   - Use Ubuntu Server 22.04 LTS
+   - Configure security groups to allow HTTP (80), HTTPS (443), and SSH (22)
+   - Create and download your key pair
 
-2. Install production dependencies:
+2. Set up the server:
 ```bash
-pip install gunicorn
-pip freeze > requirements.txt
+# SSH into your instance
+ssh -i your-key.pem ubuntu@your-ec2-ip
+
+# Clone the repository
+git clone https://github.com/Silin144/Moosic.git
+cd Moosic
+
+# Install dependencies
+sudo apt-get update
+sudo apt-get install -y python3-pip nodejs npm
+sudo npm install -g pm2
+
+# Set up Python environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-3. Create Heroku app and deploy:
+3. Configure environment variables:
 ```bash
-heroku create your-app-name
-heroku git:remote -a your-app-name
-git push heroku main
+# Create .env file
+echo "SPOTIFY_CLIENT_ID=your_id
+SPOTIFY_CLIENT_SECRET=your_secret
+OPENAI_API_KEY=your_key
+SPOTIFY_REDIRECT_URI=https://your-frontend-domain.com/api/callback
+FRONTEND_URL=https://your-frontend-domain.com
+BACKEND_URL=https://your-backend-domain.com" | sudo tee .env
 ```
 
-4. Set environment variables in Heroku:
+4. Start the server with PM2:
 ```bash
-heroku config:set SPOTIFY_CLIENT_ID=your_id
-heroku config:set SPOTIFY_CLIENT_SECRET=your_secret
-heroku config:set SPOTIFY_REDIRECT_URI=https://your-frontend-domain.com/api/callback
-heroku config:set OPENAI_API_KEY=your_key
-heroku config:set FRONTEND_URL=https://your-frontend-domain.com
+# Start the server
+pm2 start server.py --name moosic-backend
+
+# Ensure PM2 starts on system reboot
+pm2 startup
+pm2 save
+```
+
+5. (Optional) Set up Nginx as a reverse proxy:
+```bash
+sudo apt-get install -y nginx
+sudo nano /etc/nginx/sites-available/moosic
+
+# Add the following configuration:
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+sudo ln -s /etc/nginx/sites-available/moosic /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
 ```
 
 ### Important Deployment Steps
@@ -131,6 +172,18 @@ heroku config:set FRONTEND_URL=https://your-frontend-domain.com
    - Test Spotify authentication flow
    - Ensure playlist creation works
 
+4. Monitor the application:
+```bash
+# View PM2 status
+pm2 status
+
+# View logs
+pm2 logs moosic-backend
+
+# Monitor resources
+pm2 monit
+```
+
 ## Tech Stack
 
 - Frontend:
@@ -145,6 +198,7 @@ heroku config:set FRONTEND_URL=https://your-frontend-domain.com
   - Flask
   - Spotipy (Spotify API)
   - OpenAI API
+  - PM2 process manager
 
 ## Contributing
 

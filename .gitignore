@@ -52,6 +52,11 @@ Thumbs.db
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
 
+# AWS EC2
+*.pem
+*Key*
+setup-ec2.sh
+
 # Cache
 .cache/
 
