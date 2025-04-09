@@ -1,15 +1,27 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { ThemeProvider, createTheme } from '@mui/material/styles'
-import CssBaseline from '@mui/material/CssBaseline'
+import { ThemeProvider, createTheme, CssBaseline } from '@mui/material'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './contexts/AuthContext'
 import { useAuth } from './contexts/AuthContext'
 import GeneratePlaylist from './pages/GeneratePlaylist'
 import Auth from './pages/Auth'
 
-const darkTheme = createTheme({
+const theme = createTheme({
   palette: {
     mode: 'dark',
+    primary: {
+      main: '#1DB954', // Spotify green
+    },
+    secondary: {
+      main: '#191414', // Spotify black
+    },
+    background: {
+      default: '#121212',
+      paper: '#181818',
+    },
+  },
+  typography: {
+    fontFamily: '"Circular", "Helvetica Neue", Helvetica, Arial, sans-serif',
   },
 })
 
@@ -36,10 +48,10 @@ const AppContent = () => {
   )
 }
 
-function App() {
+const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={darkTheme}>
+      <ThemeProvider theme={theme}>
         <CssBaseline />
         <AuthProvider>
           <Router>

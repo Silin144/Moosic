@@ -8,9 +8,15 @@ import openai
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
 import argparse
+from typing import List, Dict
+import logging
 
 # Load environment variables
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class PlaylistGenerator:
     def __init__(self, prompt, length=10, name=None, interactive=False):
@@ -149,6 +155,56 @@ class PlaylistGenerator:
         self.add_songs_to_playlist(playlist_id, added_songs)
         print(f"\nPlaylist created with {len(added_songs)} songs!")
         return playlist_id
+
+def generate_playlist_suggestions(mood: str, genre: str = None, era: str = None) -> List[Dict[str, str]]:
+    """
+    Generate playlist suggestions using OpenAI API
+    """
+    try:
+        # Construct the prompt
+        prompt = f"Generate a list of 10 songs for a {mood} playlist"
+        if genre:
+            prompt += f" in the {genre} genre"
+        if era:
+            prompt += f" from the {era} era"
+        prompt += ". For each song, provide the exact title and artist name. Format the response as a list of songs with 'Title - Artist' format."
+
+        logger.info(f"Generating playlist with prompt: {prompt}")
+
+        # Call OpenAI API
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a music expert who creates perfect playlists."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
+
+        # Parse the response
+        content = response.choices[0].message.content
+        logger.info(f"OpenAI response: {content}")
+
+        # Split the response into lines and parse each song
+        songs = []
+        for line in content.split('\n'):
+            if '-' in line:
+                parts = line.split('-', 1)
+                if len(parts) == 2:
+                    title = parts[0].strip()
+                    artist = parts[1].strip()
+                    songs.append({
+                        'title': title,
+                        'artist': artist
+                    })
+
+        logger.info(f"Generated {len(songs)} songs")
+        return songs
+
+    except Exception as e:
+        logger.error(f"Error generating playlist: {str(e)}")
+        raise
 
 def main():
     parser = argparse.ArgumentParser(description='Generate Spotify playlists using ChatGPT')

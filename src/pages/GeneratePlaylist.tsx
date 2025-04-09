@@ -1,126 +1,135 @@
-import React, { useState, ChangeEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Box, Button, TextField, Typography, Slider, FormControlLabel, Switch, Alert } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Button, CircularProgress, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../contexts/AuthContext';
 
-const GeneratePlaylist: React.FC = () => {
-  const navigate = useNavigate();
-  const [prompt, setPrompt] = useState('');
-  const [length, setLength] = useState(10);
-  const [name, setName] = useState('');
-  const [interactive, setInteractive] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+const moods = ['Happy', 'Sad', 'Energetic', 'Relaxed', 'Motivated', 'Nostalgic'];
+const genres = ['Pop', 'Rock', 'Hip Hop', 'Electronic', 'Jazz', 'Classical', 'R&B', 'Country'];
+const eras = ['2000s', '2010s', '2020s', '90s', '80s', '70s', '60s'];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
+const GeneratePlaylist = () => {
+  const [mood, setMood] = useState('');
+  const [genre, setGenre] = useState('');
+  const [era, setEra] = useState('');
+  const { logout } = useAuth();
 
-    try {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['playlist', mood, genre, era],
+    queryFn: async () => {
+      if (!mood) return null;
+      
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate-playlist`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          prompt,
-          length,
-          name: name || undefined,
-          interactive,
-        }),
+        body: JSON.stringify({ mood, genre, era }),
         credentials: 'include',
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate playlist');
+        throw new Error('Failed to generate playlist');
       }
 
-      setSuccess('Playlist generated successfully!');
-      setTimeout(() => {
-        navigate('/');
-      }, 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
+      return response.json();
+    },
+    enabled: false,
+  });
+
+  const handleGenerate = () => {
+    if (mood) {
+      refetch();
     }
   };
 
   return (
-    <Box sx={{ maxWidth: 600, mx: 'auto', mt: 4, p: 3 }}>
+    <Box sx={{ p: 4, maxWidth: 600, mx: 'auto' }}>
       <Typography variant="h4" component="h1" gutterBottom>
-        Generate Playlist
+        Generate Your Playlist
       </Typography>
 
-      <form onSubmit={handleSubmit}>
-        <TextField
-          fullWidth
-          label="What kind of playlist would you like?"
-          value={prompt}
-          onChange={(e: ChangeEvent<HTMLInputElement>) => setPrompt(e.target.value)}
-          margin="normal"
-          required
-          helperText="Example: 'Peaceful songs to listen to when it's raining'"
-        />
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mb: 4 }}>
+        <FormControl fullWidth>
+          <InputLabel>Mood</InputLabel>
+          <Select
+            value={mood}
+            label="Mood"
+            onChange={(e) => setMood(e.target.value)}
+          >
+            {moods.map((m) => (
+              <MenuItem key={m} value={m.toLowerCase()}>
+                {m}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
 
-        <Box sx={{ mt: 2 }}>
-          <Typography gutterBottom>Number of songs: {length}</Typography>
-          <Slider
-            value={length}
-            onChange={(_: Event, value: number | number[]) => setLength(value as number)}
-            min={1}
-            max={50}
-            step={1}
-          />
-        </Box>
+        <FormControl fullWidth>
+          <InputLabel>Genre (Optional)</InputLabel>
+          <Select
+            value={genre}
+            label="Genre"
+            onChange={(e) => setGenre(e.target.value)}
+          >
+            <MenuItem value="">Any</MenuItem>
+            {genres.map((g) => (
+              <MenuItem key={g} value={g.toLowerCase()}>
+                {g}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
 
-        <TextField
-          fullWidth
-          label="Playlist Name (optional)"
-          value={name}
-          onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
-          margin="normal"
-          helperText="Leave blank to use the prompt as the playlist name"
-        />
-
-        <FormControlLabel
-          control={
-            <Switch
-              checked={interactive}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setInteractive(e.target.checked)}
-            />
-          }
-          label="Interactive Mode"
-          sx={{ mt: 2 }}
-        />
-
-        {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert severity="success" sx={{ mt: 2 }}>
-            {success}
-          </Alert>
-        )}
+        <FormControl fullWidth>
+          <InputLabel>Era (Optional)</InputLabel>
+          <Select
+            value={era}
+            label="Era"
+            onChange={(e) => setEra(e.target.value)}
+          >
+            <MenuItem value="">Any</MenuItem>
+            {eras.map((e) => (
+              <MenuItem key={e} value={e.toLowerCase()}>
+                {e}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
 
         <Button
-          type="submit"
           variant="contained"
-          color="primary"
-          fullWidth
-          sx={{ mt: 3 }}
-          disabled={loading || !prompt}
+          onClick={handleGenerate}
+          disabled={!mood || isLoading}
+          sx={{ mt: 2 }}
         >
-          {loading ? 'Generating...' : 'Generate Playlist'}
+          {isLoading ? <CircularProgress size={24} /> : 'Generate Playlist'}
         </Button>
-      </form>
+
+        <Button
+          variant="outlined"
+          onClick={logout}
+          sx={{ mt: 2 }}
+        >
+          Logout
+        </Button>
+      </Box>
+
+      {error && (
+        <Typography color="error" sx={{ mt: 2 }}>
+          {error.message}
+        </Typography>
+      )}
+
+      {data && (
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h6" gutterBottom>
+            Your Playlist
+          </Typography>
+          <Typography variant="body1">
+            Playlist created successfully! Check your Spotify account.
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 };
