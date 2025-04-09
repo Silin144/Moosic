@@ -8,14 +8,18 @@ from flask_cors import CORS
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import openai
+from dotenv import load_dotenv
 
-# Set environment variables
-os.environ['SPOTIFY_REDIRECT_URI'] = 'https://moosic-liart.vercel.app/api/callback'
-os.environ['SPOTIFY_CLIENT_ID'] = 'd5d0c24877cb45e58f67a8e95c711f10'
-os.environ['SPOTIFY_CLIENT_SECRET'] = 'a3b14b591f7d407890076f0a7e91110c'
-os.environ['FRONTEND_URL'] = 'https://moosic-liart.vercel.app'
-os.environ['BACKEND_URL'] = 'http://3.148.173.124:3001'
-os.environ['PORT'] = '3001'
+load_dotenv()
+
+# Configure environment variables
+os.environ['SPOTIFY_REDIRECT_URI'] = os.getenv('SPOTIFY_REDIRECT_URI', 'https://moosic-liart.vercel.app/api/callback')
+os.environ['SPOTIFY_CLIENT_ID'] = os.getenv('SPOTIFY_CLIENT_ID', 'd5d0c24877cb45e58f67a8e95c711f10')
+os.environ['SPOTIFY_CLIENT_SECRET'] = os.getenv('SPOTIFY_CLIENT_SECRET', 'a3b14b591f7d407890076f0a7e91110c')
+os.environ['FRONTEND_URL'] = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app')
+os.environ['BACKEND_URL'] = os.getenv('BACKEND_URL', 'http://3.148.173.124:3001')
+os.environ['PORT'] = os.getenv('PORT', '3001')
+os.environ['HOST'] = os.getenv('HOST', '0.0.0.0')
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Required for session handling
@@ -168,4 +172,4 @@ def generate_playlist():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=SERVER_PORT) 
+    app.run(host=os.getenv('HOST', '0.0.0.0'), port=int(os.getenv('PORT', '3001'))) 

@@ -9,7 +9,8 @@ module.exports = {
       SPOTIFY_CLIENT_SECRET: 'a3b14b591f7d407890076f0a7e91110c',
       FRONTEND_URL: 'https://moosic-liart.vercel.app',
       BACKEND_URL: 'http://3.148.173.124:3001',
-      PORT: '3001'
+      PORT: '3001',
+      HOST: '0.0.0.0'
     }
   }]
 } 
