@@ -44,20 +44,23 @@ app.secret_key = os.urandom(24)  # Required for session handling
 # Configure CORS
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["*"],  # Allow all origins during development
+        "origins": ["https://moosic-liart.vercel.app"],  # Only allow the production frontend
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "Origin", "Accept"],
         "supports_credentials": True,
-        "expose_headers": ["Content-Type", "Authorization"]
+        "expose_headers": ["Content-Type", "Authorization"],
+        "allow_credentials": True,
+        "max_age": 3600
     }
 })
 
 # Add error handler for CORS
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Origin', 'https://moosic-liart.vercel.app')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
     return response
 
 # Configure for environment

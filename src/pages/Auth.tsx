@@ -36,23 +36,35 @@ export default function Auth() {
       return
     }
 
+    console.log('Making request to:', `${import.meta.env.VITE_API_URL}/api/login`)
+
     // Make the request to the login endpoint
     fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
       method: 'GET',
-      credentials: 'include',  // Include cookies
+      credentials: 'include',
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        'Origin': window.location.origin
       },
+      mode: 'cors'
     })
     .then(async (response) => {
+      console.log('Response status:', response.status)
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to login')
+        const text = await response.text()
+        console.error('Error response:', text)
+        try {
+          const errorData = JSON.parse(text)
+          throw new Error(errorData.error || 'Failed to login')
+        } catch (e) {
+          throw new Error(`Failed to login: ${text}`)
+        }
       }
       return response.json()
     })
     .then((data) => {
+      console.log('Received data:', data)
       if (data.auth_url) {
         window.location.href = data.auth_url
       } else {
