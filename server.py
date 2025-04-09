@@ -137,12 +137,9 @@ def callback():
         session['token_info'] = token_info
         logger.info("Successfully obtained token info")
 
-        # Return the token info to the frontend
-        return jsonify({
-            'access_token': token_info['access_token'],
-            'expires_in': token_info['expires_in'],
-            'refresh_token': token_info['refresh_token']
-        })
+        # Redirect to frontend with success
+        frontend_url = os.getenv('FRONTEND_URL', 'https://moosic.vercel.app')
+        return redirect(f"{frontend_url}/auth?from=spotify")
 
     except Exception as e:
         logger.error(f"Error in callback: {str(e)}")

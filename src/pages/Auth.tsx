@@ -20,33 +20,9 @@ const Auth: React.FC = () => {
       return
     }
 
-    if (code && from === 'spotify') {
-      setLoading(true)
-      fetch(`${import.meta.env.VITE_API_URL}/api/callback?code=${code}`, {
-        method: 'GET',
-        credentials: 'include',
-      })
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error('Failed to exchange code for token')
-          }
-          return response.json()
-        })
-        .then((data) => {
-          if (data.access_token) {
-            localStorage.setItem('spotify_token', data.access_token)
-            setIsAuthenticated(true)
-            navigate('/', { replace: true })
-          } else {
-            setError('Failed to get access token')
-          }
-        })
-        .catch((err) => {
-          setError(err.message || 'Failed to exchange code for token')
-        })
-        .finally(() => {
-          setLoading(false)
-        })
+    if (from === 'spotify') {
+      setIsAuthenticated(true)
+      navigate('/', { replace: true })
     }
   }, [searchParams, navigate, setIsAuthenticated])
 
