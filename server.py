@@ -421,8 +421,14 @@ def check_auth():
 
 @app.route('/api/logout')
 def logout():
+    # Clear session data
     session.clear()
-    return redirect(f"{os.environ['FRONTEND_URL']}/auth")
+    
+    # Redirect to auth page with special parameter to force re-auth
+    return jsonify({
+        "success": True,
+        "message": "Successfully logged out"
+    })
 
 @app.route('/api/me')
 def get_me():

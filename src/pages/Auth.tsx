@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Box, Button, Typography, CircularProgress, Alert, Paper } from '@mui/material'
 import { motion } from 'framer-motion'
@@ -26,11 +26,75 @@ const Auth: React.FC = () => {
   const [authStatus, setAuthStatus] = useState<'idle' | 'checking' | 'authenticated' | 'error'>('idle')
   const [error, setError] = useState<string>('')
 
+  // Define handleLogin with useCallback to memoize it
+  const handleLogin = useCallback(async (forcePermissionsParam?: boolean) => {
+    try {
+      // Clear any existing session data
+      localStorage.removeItem('code_verifier')
+      sessionStorage.removeItem('state')
+      
+      // Get the force_permissions parameter from props or URL
+      const params = new URLSearchParams(location.search)
+      const forcePermissions = forcePermissionsParam !== undefined 
+        ? forcePermissionsParam 
+        : params.get('force_permissions') === 'true'
+      
+      // Generate PKCE code verifier and challenge
+      const codeVerifier = generateRandomString(128)
+      const data = new TextEncoder().encode(codeVerifier)
+      const hashed = await crypto.subtle.digest('SHA-256', data)
+      const codeChallenge = base64encode(hashed)
+      
+      // Store code verifier in localStorage
+      localStorage.setItem('code_verifier', codeVerifier)
+      
+      // Generate state parameter
+      const state = generateRandomString(16)
+      sessionStorage.setItem('state', state)
+      
+      // Build authorization URL
+      const authParams = new URLSearchParams({
+        client_id: import.meta.env.VITE_SPOTIFY_CLIENT_ID || '',
+        response_type: 'code',
+        redirect_uri: import.meta.env.VITE_SPOTIFY_REDIRECT_URI || '',
+        state: state,
+        code_challenge_method: 'S256',
+        code_challenge: codeChallenge,
+        scope: 'playlist-modify-public playlist-modify-private user-read-private user-read-email user-top-read'
+      })
+      
+      // If force_permissions is true, always show the permissions dialog
+      if (forcePermissions) {
+        authParams.append('show_dialog', 'true')
+      }
+      
+      window.location.href = `https://accounts.spotify.com/authorize?${authParams.toString()}`
+    } catch (err) {
+      console.error('Login error:', err)
+      setAuthStatus('error')
+      setError('Failed to initialize login')
+    }
+  }, [location.search])
+
   useEffect(() => {
     const checkAuth = async () => {
       try {
         setAuthStatus('checking')
         console.log('Checking authentication status...')
+        
+        // Check if we're forcing permissions
+        const params = new URLSearchParams(location.search)
+        const forcePermissions = params.get('force_permissions') === 'true'
+        
+        // If we're forcing permissions, skip the auth check and go straight to login
+        if (forcePermissions) {
+          console.log('Forcing permissions, skipping auth check')
+          setAuthStatus('idle')
+          // Wait a moment then trigger the login flow
+          setTimeout(() => handleLogin(true), 500)
+          return
+        }
+        
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/check-auth`, {
           credentials: 'include',
           headers: {
@@ -66,6 +130,7 @@ const Auth: React.FC = () => {
     // Only run auth check if we're not in the callback flow
     const params = new URLSearchParams(location.search)
     const isCallbackFlow = !!params.get('code')
+    const forcePermissions = params.get('force_permissions') === 'true'
     
     if (params.get('auth') === 'success') {
       console.log('Auth success detected, checking auth...')
@@ -77,49 +142,15 @@ const Auth: React.FC = () => {
       // If we have a code but no auth status, we're in the callback flow
       console.log('Code parameter found in URL, handling callback...')
       // Don't run checkAuth now, let the callback handler do its work
+    } else if (forcePermissions) {
+      // If we're forcing permissions, go straight to login
+      console.log('Force permissions detected, initializing login...')
+      setAuthStatus('idle')
     } else if (authStatus !== 'checking') {
       // Only check auth if we're not already checking
       checkAuth()
     }
-  }, [location, setIsAuthenticated])
-
-  const handleLogin = async () => {
-    try {
-      // Clear any existing session data
-      localStorage.removeItem('code_verifier')
-      sessionStorage.removeItem('state')
-      
-      // Generate PKCE code verifier and challenge
-      const codeVerifier = generateRandomString(128)
-      const data = new TextEncoder().encode(codeVerifier)
-      const hashed = await crypto.subtle.digest('SHA-256', data)
-      const codeChallenge = base64encode(hashed)
-      
-      // Store code verifier in localStorage
-      localStorage.setItem('code_verifier', codeVerifier)
-      
-      // Generate state parameter
-      const state = generateRandomString(16)
-      sessionStorage.setItem('state', state)
-      
-      // Build authorization URL
-      const params = new URLSearchParams({
-        client_id: import.meta.env.VITE_SPOTIFY_CLIENT_ID || '',
-        response_type: 'code',
-        redirect_uri: import.meta.env.VITE_SPOTIFY_REDIRECT_URI || '',
-        state: state,
-        code_challenge_method: 'S256',
-        code_challenge: codeChallenge,
-        scope: 'playlist-modify-public playlist-modify-private user-read-private user-read-email'
-      })
-      
-      window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`
-    } catch (err) {
-      console.error('Login error:', err)
-      setAuthStatus('error')
-      setError('Failed to initialize login')
-    }
-  }
+  }, [location, setIsAuthenticated, handleLogin])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -305,7 +336,7 @@ const Auth: React.FC = () => {
             </Alert>
             <Button
               variant="contained"
-              onClick={handleLogin}
+              onClick={() => handleLogin(true)}
               fullWidth
               size="large"
               sx={{
@@ -449,7 +480,7 @@ const Auth: React.FC = () => {
           <Button
             variant="contained"
             size="large"
-            onClick={handleLogin}
+            onClick={() => handleLogin(true)}
             startIcon={<MusicNoteIcon />}
             sx={{
               py: 1.5,
