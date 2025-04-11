@@ -162,10 +162,10 @@ def callback():
     if request.method == 'POST':
         data = request.get_json()
         code = data.get('code')
-        code_verifier = data.get('code_verifier')
+        redirect_uri = data.get('redirect_uri')
     else:
         code = request.args.get('code')
-        code_verifier = request.args.get('code_verifier')
+        redirect_uri = request.args.get('redirect_uri')
     
     error = request.args.get('error')
     
@@ -177,17 +177,12 @@ def callback():
         logger.error("No authorization code received")
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20authorization%20code%20received")
 
-    if not code_verifier:
-        logger.error("No code verifier provided")
-        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20code%20verifier%20provided")
-
     try:
-        # Exchange code for tokens using spotipy with PKCE
+        # Exchange code for tokens using spotipy
         token_info = sp_oauth.get_access_token(
             code,
             as_dict=False,
-            check_cache=False,
-            code_verifier=code_verifier
+            check_cache=False
         )
         
         if not token_info:

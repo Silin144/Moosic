@@ -70,15 +70,10 @@ const Auth: React.FC = () => {
 
   const handleLogin = async () => {
     try {
-      // Generate PKCE code verifier and challenge
-      const codeVerifier = generateRandomString(64)
-      const encoder = new TextEncoder()
-      const data = encoder.encode(codeVerifier)
-      const digest = await crypto.subtle.digest('SHA-256', data)
-      const codeChallenge = base64encode(digest)
-
-      // Store code verifier in localStorage
-      localStorage.setItem('code_verifier', codeVerifier)
+      // Generate a random state parameter
+      const state = generateRandomString(16)
+      // Store state in localStorage for verification
+      localStorage.setItem('spotify_auth_state', state)
 
       // Clear any existing session data
       document.cookie.split(";").forEach(function(c) { 
@@ -92,8 +87,8 @@ const Auth: React.FC = () => {
         response_type: 'code',
         redirect_uri: import.meta.env.VITE_SPOTIFY_REDIRECT_URI,
         scope: 'playlist-modify-public playlist-modify-private user-read-private user-read-email',
-        code_challenge_method: 'S256',
-        code_challenge: codeChallenge,
+        state: state,
+        show_dialog: 'true'
       }
       
       authUrl.search = new URLSearchParams(params).toString()
@@ -109,6 +104,7 @@ const Auth: React.FC = () => {
     const handleCallback = async () => {
       const params = new URLSearchParams(window.location.search)
       const code = params.get('code')
+      const state = params.get('state')
       const error = params.get('error')
       
       if (error) {
@@ -117,15 +113,20 @@ const Auth: React.FC = () => {
         return
       }
       
+      // Verify state parameter
+      const storedState = localStorage.getItem('spotify_auth_state')
+      if (!state || state !== storedState) {
+        setAuthStatus('error')
+        setError('State mismatch')
+        return
+      }
+      
+      // Clear the state from localStorage
+      localStorage.removeItem('spotify_auth_state')
+      
       if (code) {
         try {
-          // Get the code verifier from localStorage
-          const codeVerifier = localStorage.getItem('code_verifier')
-          if (!codeVerifier) {
-            throw new Error('No code verifier found')
-          }
-
-          // Make a POST request to the backend with the code and verifier
+          // Make a POST request to our backend to exchange the code for tokens
           const response = await fetch(`${import.meta.env.VITE_API_URL}/api/callback`, {
             method: 'POST',
             headers: {
@@ -133,7 +134,7 @@ const Auth: React.FC = () => {
             },
             body: JSON.stringify({
               code,
-              code_verifier: codeVerifier
+              redirect_uri: import.meta.env.VITE_SPOTIFY_REDIRECT_URI
             }),
             credentials: 'include'
           })
@@ -141,9 +142,6 @@ const Auth: React.FC = () => {
           if (!response.ok) {
             throw new Error('Failed to exchange code for token')
           }
-
-          // Clear the code verifier from localStorage
-          localStorage.removeItem('code_verifier')
 
           // Redirect to success page
           window.location.href = `${window.location.origin}/auth?auth=success`
