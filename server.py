@@ -177,10 +177,6 @@ def callback():
         logger.error("No authorization code received")
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20authorization%20code%20received")
 
-    if not state:
-        logger.error("No state parameter received")
-        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20state%20parameter%20received")
-
     try:
         # Exchange code for tokens using spotipy
         token_info = sp_oauth.get_access_token(
