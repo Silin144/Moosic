@@ -394,7 +394,13 @@ const GeneratePlaylist: React.FC = () => {
               
               <Grid container spacing={3} sx={{ mt: 1 }}>
                 {playlistPreview.tracks.map((track, index) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={index}>
+                  <Box 
+                    key={index} 
+                    sx={{ 
+                      width: { xs: '100%', sm: '50%', md: '33.33%', lg: '25%' },
+                      padding: 1.5
+                    }}
+                  >
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -429,7 +435,7 @@ const GeneratePlaylist: React.FC = () => {
                         </CardContent>
                       </Card>
                     </motion.div>
-                  </Grid>
+                  </Box>
                 ))}
               </Grid>
             </Box>
