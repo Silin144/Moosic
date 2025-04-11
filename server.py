@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_DOMAIN'] = None
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600
 app.config['SESSION_COOKIE_PATH'] = '/'
@@ -67,14 +67,14 @@ app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 # Initialize Flask-Session
 Session(app)
 
-# Configure CORS
+# Configure CORS with more permissive settings
 CORS(app, resources={
     r"/api/*": {
         "origins": [os.environ['FRONTEND_URL']],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
+        "allow_headers": ["Content-Type", "Authorization", "Accept"],
         "supports_credentials": True,
-        "expose_headers": ["Content-Type", "Authorization"],
+        "expose_headers": ["Content-Type", "Authorization", "Set-Cookie"],
         "allow_credentials": True,
         "max_age": 3600
     }
@@ -83,10 +83,11 @@ CORS(app, resources={
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', os.environ['FRONTEND_URL'])
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
     response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie')
+    response.headers.add('Access-Control-Max-Age', '3600')
     return response
 
 # Configure for environment
@@ -99,7 +100,8 @@ sp_oauth = SpotifyOAuth(
     client_secret=os.getenv('SPOTIFY_CLIENT_SECRET'),
     redirect_uri=os.getenv('SPOTIFY_REDIRECT_URI'),
     scope='playlist-modify-public playlist-modify-private user-read-private user-read-email',
-    state='moosic_state'  # Add state parameter for security
+    state='moosic_state',  # Add state parameter for security
+    show_dialog=True  # Force user to approve the app each time
 )
 
 def get_spotify_client():
@@ -383,7 +385,7 @@ def generate_playlist():
         try:
             prompt = f"Generate a list of 10 songs for this playlist idea:\n{playlist_description}\n\nFormat each song as 'Song Name by Artist'"
             openai_response = openai.Completion.create(
-                model="text-davinci-003",
+                model="gpt-3.5-turbo-instruct",
                 prompt=prompt,
                 max_tokens=150
             )
