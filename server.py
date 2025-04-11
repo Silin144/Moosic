@@ -682,7 +682,7 @@ def generate_playlist():
                         "role": "system",
                         "content": """You are a professional music curator with deep industry knowledge and expertise in music history, chart hits, and cultural trends across different time periods.
 
-Your task is to generate a list of 10 songs that perfectly match the provided playlist description.
+Your task is to generate a list of 15-20 songs that perfectly match the provided playlist description.
 
 IMPORTANT RULES:
 1. NEVER suggest karaoke, covers, remixes, tributes, or "made famous by" versions of songs - STRICTLY ORIGINAL RECORDINGS ONLY.
@@ -697,20 +697,22 @@ IMPORTANT RULES:
 10. Format each song as 'Song Name by Artist Name' without any commentary.
 11. If user preferences are provided, balance between suggesting songs similar to their preferences and introducing them to new music that fits the requested description.
 12. Do NOT suggest the same song multiple times in any form.
+13. Include a diverse range of artists, with a good mix of well-known hits and deeper cuts.
+14. Aim for songs with good streaming availability on platforms like Spotify.
 
 ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions and NO duplicate songs."""
                     },
                     {
                         "role": "user",
-                        "content": f"Generate a list of 10 songs for this playlist idea:\n{playlist_description}{personalization}"
+                        "content": f"Generate a list of 15-20 songs for this playlist idea:\n{playlist_description}{personalization}"
                     }
                 ],
                 temperature=0.7,
-                max_tokens=600
+                max_tokens=800
             )
             
             song_list = [line.strip() for line in completion.choices[0].message['content'].strip().split('\n') if line.strip()]
-            logger.info(f"Generated song list: {song_list}")
+            logger.info(f"Generated song list with {len(song_list)} tracks")
             
             # Search for tracks on Spotify - add more specific search exclusions
             track_uris = []
@@ -809,44 +811,59 @@ ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions and
                             'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
                         })
                         
-            # If we have less than 5 tracks, try to add related tracks based on user's top artists
-            if len(tracks) < 5 and top_artist_names:
-                logger.info("Adding related tracks from user's top artists to fill playlist")
+            # Try to reach at least 15 tracks by adding related tracks if needed
+            if len(tracks) < 15:
+                logger.info(f"Only found {len(tracks)} tracks, adding related tracks to reach 15-20 total")
                 try:
-                    # Get top tracks from top artists
-                    for artist_name in top_artist_names[:2]:
-                        # Search for the artist
-                        artist_results = sp.search(q=f"artist:{artist_name}", type="artist", limit=1)
-                        artist_items = artist_results.get('artists', {}).get('items', [])
+                    # Use a mix of recommendations based on genres, top artists, and found tracks
+                    seed_tracks = track_uris[:2] if track_uris else []
+                    seed_artists = []
+                    seed_genres = []
+                    
+                    # Add top artists as seeds if we don't have enough tracks
+                    if len(seed_tracks) < 2 and top_artists.get('items'):
+                        for artist in top_artists['items'][:2]:
+                            if len(seed_artists) + len(seed_tracks) < 4:  # Keep total seeds under 5
+                                seed_artists.append(artist['id'])
+                    
+                    # Add genres if we still need more seeds
+                    if len(seed_tracks) + len(seed_artists) < 4 and top_artist_genres:
+                        valid_genres = ['pop', 'rock', 'hip-hop', 'country', 'electronic', 'jazz', 'indie', 'folk', 'r-n-b', 'latin']
+                        for genre in top_artist_genres:
+                            if genre in valid_genres and len(seed_genres) + len(seed_tracks) + len(seed_artists) < 5:
+                                seed_genres.append(genre)
+                    
+                    if seed_tracks or seed_artists or seed_genres:
+                        recommendation_params = {
+                            'limit': 20 - len(tracks),  # Add enough to reach 20 total
+                            'market': 'US'
+                        }
                         
-                        if artist_items:
-                            artist_id = artist_items[0]['id']
-                            top_tracks = sp.artist_top_tracks(artist_id)
-                            
-                            # Add up to 2 tracks per top artist
-                            for i, track in enumerate(top_tracks['tracks'][:2]):
-                                # Skip if we already have a track by this artist
-                                track_artist = track['artists'][0]['name'].lower()
-                                if track_artist in added_artists:
-                                    continue
-                                    
-                                added_artists.add(track_artist)
-                                track_uris.append(track['uri'])
-                                tracks.append({
-                                    'name': track['name'],
-                                    'artist': track['artists'][0]['name'],
-                                    'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
-                                })
-                                
-                                # Stop if we have 10 tracks
-                                if len(tracks) >= 10:
-                                    break
-                            
-                            # Stop if we have 10 tracks
-                            if len(tracks) >= 10:
-                                break
+                        if seed_tracks:
+                            recommendation_params['seed_tracks'] = ','.join(seed_tracks[:2])
+                        if seed_artists:
+                            recommendation_params['seed_artists'] = ','.join(seed_artists[:2])
+                        if seed_genres:
+                            recommendation_params['seed_genres'] = ','.join(seed_genres[:2])
+                        
+                        recommendations = sp._get('recommendations', params=recommendation_params)
+                        
+                        if recommendations and recommendations.get('tracks'):
+                            # Add only tracks from artists we haven't included yet
+                            for rec_track in recommendations['tracks']:
+                                rec_artist = rec_track['artists'][0]['name'].lower()
+                                if rec_artist not in added_artists and len(tracks) < 20:
+                                    added_artists.add(rec_artist)
+                                    track_uris.append(rec_track['uri'])
+                                    tracks.append({
+                                        'name': rec_track['name'],
+                                        'artist': rec_track['artists'][0]['name'],
+                                        'album_image': rec_track['album']['images'][0]['url'] if rec_track['album']['images'] else None
+                                    })
+                        
+                        logger.info(f"Added {len(tracks) - len(song_list)} recommendation tracks, total: {len(tracks)}")
                 except Exception as e:
-                    logger.warning(f"Error adding related tracks: {str(e)}")
+                    logger.warning(f"Error adding recommendation tracks: {str(e)}")
 
             # Create playlist
             create_playlist_url = f"https://api.spotify.com/v1/users/{session['user']['id']}/playlists"

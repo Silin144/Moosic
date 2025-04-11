@@ -23,7 +23,8 @@ import {
   Avatar,
   useTheme,
   alpha,
-  Link
+  Link,
+  Badge
 } from '@mui/material'
 import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
@@ -46,6 +47,12 @@ import ListItemText from '@mui/material/ListItemText'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import PauseIcon from '@mui/icons-material/Pause'
 import LockIcon from '@mui/icons-material/Lock'
+import BookmarkIcon from '@mui/icons-material/Bookmark'
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import TuneIcon from '@mui/icons-material/Tune'
+import RepeatIcon from '@mui/icons-material/Repeat'
+import HistoryIcon from '@mui/icons-material/History'
 
 interface Track {
   name: string
@@ -67,6 +74,15 @@ interface PlaylistPreview {
   tracks: Track[]
 }
 
+interface PlaylistHistory {
+  id: string
+  description: string
+  name: string
+  url: string
+  createdAt: number
+  tracks: Track[]
+}
+
 const GeneratePlaylist: React.FC = () => {
   const navigate = useNavigate()
   const theme = useTheme()
@@ -84,6 +100,18 @@ const GeneratePlaylist: React.FC = () => {
   const [topTracksError, setTopTracksError] = useState<string | null>(null)
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null)
   const [needsReauth, setNeedsReauth] = useState(false)
+  const [savedPrompts, setSavedPrompts] = useState<string[]>([])
+  const [showSavedPrompts, setShowSavedPrompts] = useState<boolean>(false)
+  const [showTips, setShowTips] = useState<boolean>(true)
+  const [playlistHistory, setPlaylistHistory] = useState<PlaylistHistory[]>([])
+  const [showHistory, setShowHistory] = useState<boolean>(false)
+  const [recommendedPrompts, setRecommendedPrompts] = useState<string[]>([
+    "Uplifting indie folk with acoustic guitars",
+    "90s hip-hop classics perfect for a road trip",
+    "Modern pop hits with female vocalists",
+    "Electronic ambient music for deep focus and work",
+    "Jazz fusion with elements of funk and soul"
+  ])
 
   // Check auth status only once when component mounts
   React.useEffect(() => {
@@ -146,6 +174,54 @@ const GeneratePlaylist: React.FC = () => {
     fetchTopTracks();
   }, [isAuthenticated, fetchWithAuth]);
 
+  // Load saved prompts from localStorage
+  useEffect(() => {
+    const loadedPrompts = localStorage.getItem('savedPrompts')
+    if (loadedPrompts) {
+      try {
+        setSavedPrompts(JSON.parse(loadedPrompts))
+      } catch (e) {
+        console.error('Failed to parse saved prompts', e)
+      }
+    }
+  }, [])
+
+  // Load playlist history from localStorage
+  useEffect(() => {
+    const loadedHistory = localStorage.getItem('playlistHistory')
+    if (loadedHistory) {
+      try {
+        setPlaylistHistory(JSON.parse(loadedHistory))
+      } catch (e) {
+        console.error('Failed to parse playlist history', e)
+      }
+    }
+  }, [])
+
+  // Save prompt to localStorage
+  const handleSavePrompt = (prompt: string) => {
+    if (!prompt.trim()) return
+    
+    const newSavedPrompts = [...savedPrompts]
+    
+    // If prompt already exists, remove it (toggle behavior)
+    const existingIndex = newSavedPrompts.indexOf(prompt)
+    if (existingIndex >= 0) {
+      newSavedPrompts.splice(existingIndex, 1)
+    } else {
+      // Otherwise add it
+      newSavedPrompts.push(prompt)
+    }
+    
+    setSavedPrompts(newSavedPrompts)
+    localStorage.setItem('savedPrompts', JSON.stringify(newSavedPrompts))
+    setShowSuccess(true)
+  }
+
+  const isPromptSaved = (prompt: string) => {
+    return savedPrompts.includes(prompt)
+  }
+
   const handlePlayPreview = (trackId: string, previewUrl: string | null) => {
     if (!previewUrl) return;
     
@@ -200,6 +276,10 @@ const GeneratePlaylist: React.FC = () => {
       }
 
       setPlaylistPreview(data)
+      
+      // Save to history when playlist is successfully generated
+      saveToHistory(data, description.trim())
+      
       setShowSuccess(true)
     } catch (err) {
       console.error('Generate playlist error:', err);
@@ -260,6 +340,22 @@ const GeneratePlaylist: React.FC = () => {
       window.location.href = '/auth?force_permissions=true';
     }
   };
+
+  // Save a new playlist to history
+  const saveToHistory = (playlist: PlaylistPreview, promptDescription: string) => {
+    const newHistoryItem: PlaylistHistory = {
+      id: Date.now().toString(),
+      description: promptDescription,
+      name: playlist.playlist_name,
+      url: playlist.playlist_url,
+      createdAt: Date.now(),
+      tracks: playlist.tracks.slice(0, 3) // Only save first 3 tracks for preview
+    }
+    
+    const newHistory = [newHistoryItem, ...playlistHistory].slice(0, 10) // Keep only the most recent 10
+    setPlaylistHistory(newHistory)
+    localStorage.setItem('playlistHistory', JSON.stringify(newHistory))
+  }
 
   if (!isAuthenticated) {
     return (
@@ -387,6 +483,214 @@ const GeneratePlaylist: React.FC = () => {
           </motion.div>
         )}
 
+        {/* Recommended For You Section */}
+        {!playlistPreview && isAuthenticated && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                p: 4, 
+                background: alpha(theme.palette.background.paper, 0.8),
+                backdropFilter: 'blur(10px)',
+                borderRadius: 4,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                maxWidth: '900px',
+                mx: 'auto',
+                mb: 6
+              }}
+            >
+              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <SpotifyIcon color="primary" sx={{ fontSize: 30 }} />
+                  <Typography variant="h4" fontWeight="600">
+                    Recommended For You
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                Try these personalized playlist ideas based on your listening habits
+              </Typography>
+
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+                {recommendedPrompts.map((prompt, index) => (
+                  <Box 
+                    key={index}
+                    sx={{
+                      p: 2,
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                      borderRadius: 2,
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      width: { xs: '100%', sm: 'calc(50% - 8px)', md: 'calc(33.33% - 11px)' },
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: (theme) => `0 8px 20px ${alpha(theme.palette.common.black, 0.1)}`,
+                        bgcolor: alpha(theme.palette.primary.main, 0.05)
+                      }
+                    }}
+                    onClick={() => {
+                      setDescription(prompt);
+                      const playlistFormElement = document.getElementById('playlist-form');
+                      if (playlistFormElement) {
+                        playlistFormElement.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                  >
+                    <Typography variant="subtitle1">{prompt}</Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+                      <Button 
+                        size="small" 
+                        variant="text" 
+                        startIcon={<PlaylistAddIcon />}
+                      >
+                        Generate
+                      </Button>
+                      <IconButton 
+                        size="small" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSavePrompt(prompt);
+                        }}
+                      >
+                        {isPromptSaved(prompt) ? <BookmarkIcon color="primary" /> : <BookmarkBorderIcon />}
+                      </IconButton>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </Paper>
+          </motion.div>
+        )}
+        
+        {/* History Section */}
+        {!playlistPreview && playlistHistory.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                p: 4, 
+                background: alpha(theme.palette.background.paper, 0.8),
+                backdropFilter: 'blur(10px)',
+                borderRadius: 4,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                maxWidth: '900px',
+                mx: 'auto',
+                mb: 6
+              }}
+            >
+              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <HistoryIcon color="primary" sx={{ fontSize: 30 }} />
+                  <Typography variant="h4" fontWeight="600">
+                    Recently Generated
+                  </Typography>
+                </Box>
+                <Button 
+                  variant="text" 
+                  size="small"
+                  onClick={() => setShowHistory(!showHistory)}
+                >
+                  {showHistory ? "Show Less" : "View All"}
+                </Button>
+              </Box>
+              
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                Your recently created playlists
+              </Typography>
+
+              <Box sx={{ mb: 3 }}>
+                {(showHistory ? playlistHistory : playlistHistory.slice(0, 3)).map((playlist, index) => (
+                  <Box
+                    key={playlist.id}
+                    sx={{
+                      p: 2,
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                      borderRadius: 2,
+                      mb: 2,
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.common.black, 0.1)}`,
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight="medium">
+                          {playlist.name.replace('AI Generated: ', '')}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          {playlist.description}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(playlist.createdAt).toLocaleDateString()}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          href={playlist.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          startIcon={<SpotifyIcon />}
+                          sx={{ borderRadius: 4 }}
+                        >
+                          Open
+                        </Button>
+                      </Box>
+                    </Box>
+                    {playlist.tracks.length > 0 && (
+                      <Box sx={{ display: 'flex', mt: 2, gap: 1, flexWrap: 'nowrap', overflow: 'hidden' }}>
+                        {playlist.tracks.map((track, idx) => (
+                          <Box 
+                            key={idx} 
+                            sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              p: 1, 
+                              borderRadius: 1,
+                              bgcolor: alpha(theme.palette.background.paper, 0.4),
+                              minWidth: 0,
+                              maxWidth: { xs: '100%', sm: '33%' },
+                              flex: '1 0 auto'
+                            }}
+                          >
+                            <Avatar 
+                              src={track.album_image} 
+                              variant="rounded" 
+                              sx={{ width: 32, height: 32, mr: 1 }} 
+                            />
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 'medium' }}>
+                                {track.name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                                {track.artist}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+            </Paper>
+          </motion.div>
+        )}
+
         {/* Top Tracks Section - show only when no playlist is being previewed */}
         {!playlistPreview && topTracks.length > 0 && (
           <motion.div
@@ -420,6 +724,11 @@ const GeneratePlaylist: React.FC = () => {
                   startIcon={<PlaylistAddIcon />}
                   onClick={() => {
                     setDescription("Create a playlist based on my top tracks with similar vibes");
+                    // Scroll to the playlist generation section
+                    const playlistFormElement = document.getElementById('playlist-form');
+                    if (playlistFormElement) {
+                      playlistFormElement.scrollIntoView({ behavior: 'smooth' });
+                    }
                   }}
                 >
                   Generate Similar Playlist
@@ -530,6 +839,7 @@ const GeneratePlaylist: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <Paper 
+              id="playlist-form"
               elevation={3} 
               sx={{ 
                 p: 4, 
@@ -562,8 +872,131 @@ const GeneratePlaylist: React.FC = () => {
                 placeholder="For example: 'Upbeat 90s rock songs that remind me of road trips' or '2023 chill pop hits to relax to'"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                sx={{ mb: 3 }}
+                sx={{ mb: 1 }}
               />
+              
+              {/* Bookmark & Saved prompt controls */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  {description.trim() && (
+                    <Tooltip title={isPromptSaved(description) ? "Remove from saved" : "Save this prompt"}>
+                      <IconButton 
+                        size="small" 
+                        color="primary" 
+                        onClick={() => handleSavePrompt(description)}
+                        sx={{ mr: 1 }}
+                      >
+                        {isPromptSaved(description) ? <BookmarkIcon /> : <BookmarkBorderIcon />}
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  
+                  <Button 
+                    variant="text" 
+                    size="small" 
+                    startIcon={<BookmarkIcon />}
+                    onClick={() => setShowSavedPrompts(!showSavedPrompts)}
+                    disabled={savedPrompts.length === 0}
+                  >
+                    {showSavedPrompts ? "Hide saved" : `Saved prompts (${savedPrompts.length})`}
+                  </Button>
+                </Box>
+                
+                <Button
+                  variant="text"
+                  size="small"
+                  startIcon={showTips ? <InfoOutlinedIcon /> : <TuneIcon />}
+                  onClick={() => setShowTips(!showTips)}
+                >
+                  {showTips ? "Hide tips" : "Show tips"}
+                </Button>
+              </Box>
+
+              {/* Saved prompts dropdown */}
+              {showSavedPrompts && savedPrompts.length > 0 && (
+                <Paper 
+                  elevation={2} 
+                  sx={{ 
+                    mb: 3, 
+                    p: 2,
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Your saved prompts:
+                  </Typography>
+                  <Stack spacing={1}>
+                    {savedPrompts.map((prompt, index) => (
+                      <Box 
+                        key={index}
+                        sx={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          p: 1,
+                          borderRadius: 1,
+                          cursor: 'pointer',
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05) }
+                        }}
+                        onClick={() => setDescription(prompt)}
+                      >
+                        <Typography variant="body2" noWrap sx={{ maxWidth: '80%' }}>
+                          {prompt}
+                        </Typography>
+                        <Box>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDescription(prompt)
+                            }}
+                          >
+                            <RepeatIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            color="primary"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSavePrompt(prompt)
+                            }}
+                          >
+                            <BookmarkIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Paper>
+              )}
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+                <Typography variant="subtitle1" color="text.secondary">
+                  Playlist Options
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  <Chip 
+                    label="15-20 songs" 
+                    color="primary" 
+                    variant="filled" 
+                    sx={{ fontWeight: 'medium' }} 
+                  />
+                  <Chip 
+                    label="No karaoke versions" 
+                    color="primary" 
+                    variant="filled" 
+                    sx={{ fontWeight: 'medium' }} 
+                  />
+                  <Chip 
+                    label="Based on your taste" 
+                    color="primary" 
+                    variant="filled" 
+                    sx={{ fontWeight: 'medium' }} 
+                  />
+                </Box>
+              </Box>
 
               <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                 <Button
@@ -586,6 +1019,57 @@ const GeneratePlaylist: React.FC = () => {
             </Paper>
             
             <Box sx={{ textAlign: 'center', mb: 8 }}>
+              <Typography variant="h6" gutterBottom color="text.secondary">
+                Playlist Creation Tips
+              </Typography>
+              <Paper 
+                elevation={1} 
+                sx={{ 
+                  p: 3, 
+                  background: alpha(theme.palette.background.paper, 0.6),
+                  backdropFilter: 'blur(10px)',
+                  borderRadius: 2,
+                  maxWidth: '900px',
+                  mx: 'auto',
+                  mb: 4
+                }}
+              >
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3, textAlign: 'left' }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      Better Results
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      • Be specific about genres, moods, and time periods<br />
+                      • Mention activities like "running" or "studying"<br />
+                      • Include specific artists as inspiration<br />
+                      • Describe the emotional feeling you want
+                    </Typography>
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      Try Combining
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      • Mix genres: "Folk + electronic fusion"<br />
+                      • Blend eras: "80s synth with modern vocals"<br />
+                      • Specify transitions: "Starting upbeat, ending relaxed"<br />
+                      • Cultural mixes: "K-pop meets Latin rhythms"
+                    </Typography>
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      Fun Ideas
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      • Songs that tell a story when played in order<br />
+                      • Music from your favorite TV show/movie<br />
+                      • A journey through music history by decade<br />
+                      • Hidden gems from popular artists
+                    </Typography>
+                  </Box>
+                </Box>
+              </Paper>
               <Typography variant="h6" gutterBottom color="text.secondary">
                 Popular Ideas to Try
               </Typography>
@@ -688,6 +1172,14 @@ const GeneratePlaylist: React.FC = () => {
                       >
                         Create New Playlist
                       </Button>
+                      <Button
+                        variant="outlined"
+                        startIcon={<BookmarkBorderIcon />}
+                        onClick={() => handleSavePrompt(description)}
+                        sx={{ display: { xs: 'none', sm: 'flex' } }}
+                      >
+                        Save Prompt
+                      </Button>
                     </Box>
                   </Box>
                   
@@ -723,7 +1215,20 @@ const GeneratePlaylist: React.FC = () => {
                 <Divider sx={{ my: 3 }} />
                 
                 <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <AudiotrackIcon /> Playlist Songs
+                  <AudiotrackIcon /> 
+                  Playlist Songs 
+                  <Badge 
+                    badgeContent={playlistPreview.tracks.length} 
+                    color="primary"
+                    sx={{ 
+                      '& .MuiBadge-badge': { 
+                        fontSize: '0.8rem', 
+                        height: '22px', 
+                        minWidth: '22px',
+                        borderRadius: '11px'
+                      } 
+                    }}
+                  />
                 </Typography>
                 
                 <Grid container spacing={3} sx={{ mt: 1 }}>
