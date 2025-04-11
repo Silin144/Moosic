@@ -134,42 +134,61 @@ def callback():
     code = request.args.get('code')
     error = request.args.get('error')
     
-    if error or not code:
-        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?auth=error&message=Spotify%20login%20failed")
-
-    # Exchange code for tokens
-    token_url = 'https://accounts.spotify.com/api/token'
-    response = requests.post(token_url, data={
-        'grant_type': 'authorization_code',
-        'code': code,
-        'redirect_uri': os.getenv('SPOTIFY_REDIRECT_URI'),
-        'client_id': os.getenv('SPOTIFY_CLIENT_ID'),
-        'client_secret': os.getenv('SPOTIFY_CLIENT_SECRET')
-    })
-
-    if response.status_code != 200:
-        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?auth=error&message=Failed%20to%20retrieve%20tokens")
-
-    token_data = response.json()
-    session['access_token'] = token_data['access_token']
-    session['refresh_token'] = token_data['refresh_token']
+    if error:
+        logger.error(f"Spotify auth error: {error}")
+        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message={error}")
     
-    # Get user info
-    user_info_res = requests.get(
-        'https://api.spotify.com/v1/me',
-        headers={"Authorization": f"Bearer {token_data['access_token']}"}
-    )
-    
-    if user_info_res.status_code == 200:
+    if not code:
+        logger.error("No authorization code received")
+        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20authorization%20code%20received")
+
+    try:
+        # Exchange code for tokens
+        token_url = 'https://accounts.spotify.com/api/token'
+        response = requests.post(
+            token_url,
+            data={
+                'grant_type': 'authorization_code',
+                'code': code,
+                'redirect_uri': os.environ['SPOTIFY_REDIRECT_URI'],
+                'client_id': os.environ['SPOTIFY_CLIENT_ID'],
+                'client_secret': os.environ['SPOTIFY_CLIENT_SECRET']
+            },
+            headers={
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Token exchange failed: {response.status_code} - {response.text}")
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20exchange%20code%20for%20tokens")
+
+        token_data = response.json()
+        session['access_token'] = token_data['access_token']
+        session['refresh_token'] = token_data['refresh_token']
+        session['token_expires_at'] = int(time.time()) + token_data['expires_in']
+        
+        # Get user info
+        user_info_res = requests.get(
+            'https://api.spotify.com/v1/me',
+            headers={"Authorization": f"Bearer {token_data['access_token']}"}
+        )
+        
+        if user_info_res.status_code != 200:
+            logger.error(f"Failed to get user info: {user_info_res.status_code} - {user_info_res.text}")
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20user%20info")
+
         user_info = user_info_res.json()
         session['spotify_user_id'] = user_info.get('id')
         session['user_name'] = user_info.get('display_name')
         session['user_email'] = user_info.get('email')
-        session['user_image'] = user_info.get('images', [{}])[0].get('url')
-    else:
-        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?auth=error&message=Failed%20to%20get%20user%20info")
+        session['user_image'] = user_info.get('images', [{}])[0].get('url') if user_info.get('images') else None
 
-    return redirect(f"{os.getenv('FRONTEND_URL')}/auth?auth=success")
+        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=success")
+
+    except Exception as e:
+        logger.error(f"Error in callback: {str(e)}")
+        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=An%20error%20occurred%20during%20authentication")
 
 @app.route('/api/check-auth')
 def check_auth():
@@ -188,7 +207,7 @@ def check_auth():
 @app.route('/api/logout')
 def logout():
     session.clear()
-    return redirect(f"{os.getenv('FRONTEND_URL')}/auth")
+    return redirect(f"{os.environ['FRONTEND_URL']}/auth")
 
 @app.route('/api/me')
 def get_me():
