@@ -84,12 +84,14 @@ CORS(app, resources={
 
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', os.environ['FRONTEND_URL'])
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie')
-    response.headers.add('Access-Control-Max-Age', '3600')
+    # Don't override CORS headers for OPTIONS requests
+    if request.method != 'OPTIONS':
+        response.headers.add('Access-Control-Allow-Origin', os.environ['FRONTEND_URL'])
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie')
+        response.headers.add('Access-Control-Max-Age', '3600')
     return response
 
 # Configure for environment
@@ -161,50 +163,78 @@ def login():
 def callback():
     try:
         if request.method == 'POST':
-            data = request.get_json()
+            # Log the content type and body for debugging
+            logger.info(f"Received POST request with Content-Type: {request.headers.get('Content-Type')}")
+            logger.info(f"Request body format: {type(request.data)}")
+            
+            # Handle different content types
+            if request.is_json:
+                data = request.json
+                logger.info(f"Parsed JSON data: {data.keys() if data else 'None'}")
+            else:
+                # Try to parse JSON from raw data
+                try:
+                    data = json.loads(request.data.decode('utf-8'))
+                    logger.info(f"Manually parsed JSON data: {data.keys() if data else 'None'}")
+                except Exception as e:
+                    logger.error(f"Failed to parse request body: {e}")
+                    data = {}
+            
             code = data.get('code')
             state = data.get('state')
             code_verifier = data.get('code_verifier')
+            
+            logger.info(f"POST params: code={code[:10] if code else None}..., state={state}, verifier={code_verifier[:10] if code_verifier else None}...")
         else:
             # For GET requests (initial Spotify redirect), just redirect to frontend
             code = request.args.get('code')
             state = request.args.get('state')
+            logger.info(f"GET params: code={code[:10] if code else None}..., state={state}")
             return redirect(f"{os.environ['FRONTEND_URL']}/auth?code={code}&state={state}")
         
         error = request.args.get('error')
         
         if error:
             logger.error(f"Spotify auth error: {error}")
+            if request.method == 'POST':
+                return jsonify({"status": "error", "message": error}), 400
             return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message={error}")
         
         if not code:
             logger.error("No authorization code received")
+            if request.method == 'POST':
+                return jsonify({"status": "error", "message": "No authorization code received"}), 400
             return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20authorization%20code%20received")
 
-        if not code_verifier:
+        if not code_verifier and request.method == 'POST':
             logger.error("No code verifier received")
-            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20code%20verifier%20received")
+            return jsonify({"status": "error", "message": "No code verifier received"}), 400
 
         # Log the received code and state for debugging
-        logger.info(f"Received code: {code[:10]}...")
+        logger.info(f"Received code: {code[:10] if code else 'None'}...")
         logger.info(f"Received state: {state}")
-        logger.info(f"Received code_verifier: {code_verifier[:10]}...")
+        if code_verifier:
+            logger.info(f"Received code_verifier: {code_verifier[:10]}...")
 
         # Exchange code for tokens using spotipy with PKCE
         try:
             token_info = sp_oauth.get_access_token(
                 code,
-                as_dict=False,
+                as_dict=True,  # Changed to True for easier handling
                 check_cache=False,
                 code_verifier=code_verifier
             )
             logger.info("Successfully obtained token info")
         except Exception as e:
             logger.error(f"Error getting access token: {str(e)}")
+            if request.method == 'POST':
+                return jsonify({"status": "error", "message": f"Failed to get access token: {str(e)}"}), 400
             return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20access%20token")
         
         if not token_info:
             logger.error("Token info is None")
+            if request.method == 'POST':
+                return jsonify({"status": "error", "message": "Failed to get access token"}), 400
             return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20access%20token")
         
         # Store token info in session
@@ -221,10 +251,14 @@ def callback():
             logger.info(f"Successfully obtained user info for user: {user_info.get('id')}")
         except Exception as e:
             logger.error(f"Error getting user info: {str(e)}")
+            if request.method == 'POST':
+                return jsonify({"status": "error", "message": f"Failed to get user info: {str(e)}"}), 400
             return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20user%20info")
         
         if not user_info:
             logger.error("User info is None")
+            if request.method == 'POST':
+                return jsonify({"status": "error", "message": "Failed to get user info"}), 400
             return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20user%20info")
         
         session['user'] = {
@@ -239,15 +273,16 @@ def callback():
         
         # Log successful authentication
         logger.info(f"User {user_info.get('id')} authenticated successfully")
+        logger.info(f"Session keys after auth: {list(session.keys())}")
         
         if request.method == 'POST':
-            return jsonify({"status": "success"})
+            return jsonify({"status": "success", "user": session['user']})
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=success")
 
     except Exception as e:
         logger.error(f"Unexpected error in callback: {str(e)}")
         if request.method == 'POST':
-            return jsonify({"status": "error", "message": str(e)}), 400
+            return jsonify({"status": "error", "message": str(e)}), 500
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=An%20error%20occurred%20during%20authentication")
 
 @app.route('/api/check-auth')

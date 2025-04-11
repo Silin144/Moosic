@@ -136,35 +136,52 @@ const Auth: React.FC = () => {
       // Make the POST request to our backend
       const exchangeCode = async () => {
         try {
+          setAuthStatus('checking');
+          console.log('Exchanging code for tokens...');
           const response = await fetch(`${import.meta.env.VITE_API_URL}/api/callback`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json'
             },
             body: JSON.stringify({
               code,
               state,
               code_verifier: codeVerifier
             }),
-            credentials: 'include'
-          })
+            credentials: 'include',
+            mode: 'cors'
+          });
+          
+          console.log('Response status:', response.status);
           
           if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.message || 'Failed to exchange code for tokens')
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
+            let errorMessage = 'Failed to exchange code for tokens';
+            try {
+              const errorData = JSON.parse(errorText);
+              errorMessage = errorData.message || errorMessage;
+            } catch (e) {
+              // If parsing fails, use the error text directly
+              errorMessage = errorText || errorMessage;
+            }
+            throw new Error(errorMessage);
           }
           
           // Clear the code verifier
-          localStorage.removeItem('code_verifier')
+          localStorage.removeItem('code_verifier');
           
-          // Redirect to success page
-          window.location.href = '/auth?auth=success'
+          // Success - update auth status and redirect
+          setIsAuthenticated(true);
+          setAuthStatus('authenticated');
+          navigate('/?auth=success');
         } catch (error) {
-          console.error('Error during callback:', error)
-          setAuthStatus('error')
-          setError(error instanceof Error ? error.message : 'An error occurred during authentication')
+          console.error('Error during callback:', error);
+          setAuthStatus('error');
+          setError(error instanceof Error ? error.message : 'An error occurred during authentication');
         }
-      }
+      };
       
       exchangeCode()
     }
