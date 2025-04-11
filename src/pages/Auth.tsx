@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 const Auth: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isAuthenticated, setIsAuthenticated } = useAuth()
+  const { setIsAuthenticated } = useAuth()
   const [authStatus, setAuthStatus] = useState<'idle' | 'checking' | 'authenticated' | 'error'>('idle')
   const [error, setError] = useState<string>('')
 
@@ -37,6 +37,7 @@ const Auth: React.FC = () => {
           setAuthStatus('idle')
         }
       } catch (err) {
+        console.error('Auth check error:', err)
         setAuthStatus('error')
         setError('Failed to check authentication status')
       }
@@ -58,7 +59,7 @@ const Auth: React.FC = () => {
     // Clear any existing session data
     document.cookie.split(";").forEach(function(c) { 
       document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-    });
+    })
     
     window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
   }

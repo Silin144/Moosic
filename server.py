@@ -10,8 +10,6 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import openai
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
-from playlist_generator import PlaylistGenerator
 import requests
 
 # Load environment variables
@@ -50,15 +48,21 @@ ssl_context = (
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'some_random_key')
 
+# Configure logging
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Configure session
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
-app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
-app.config['SESSION_COOKIE_PATH'] = '/'  # Set cookie path to root
-app.config['SESSION_COOKIE_NAME'] = 'moosic_session'  # Custom session cookie name
+app.config['SESSION_COOKIE_DOMAIN'] = None
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600
+app.config['SESSION_COOKIE_PATH'] = '/'
+app.config['SESSION_COOKIE_NAME'] = 'moosic_session'
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 
 # Initialize Flask-Session
 Session(app)
@@ -88,11 +92,6 @@ def after_request(response):
 # Configure for environment
 is_production = os.getenv('ENVIRONMENT') == 'production'
 app.config['PREFERRED_URL_SCHEME'] = 'https'
-
-# Configure logging
-import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Initialize Spotify OAuth with state parameter
 sp_oauth = SpotifyOAuth(
@@ -228,7 +227,7 @@ def check_auth():
                         token_data = response.json()
                         session['token_info'] = {
                             'access_token': token_data['access_token'],
-                            'refresh_token': session['token_info']['refresh_token'],  # Keep the same refresh token
+                            'refresh_token': session['token_info']['refresh_token'],
                             'expires_at': int(time.time()) + token_data['expires_in']
                         }
                         session.modified = True
@@ -366,93 +365,102 @@ def create_playlist():
 
 @app.route('/api/generate-playlist', methods=['POST'])
 def generate_playlist():
-    if 'access_token' not in session or 'spotify_user_id' not in session:
-        return jsonify({"error": "User not authenticated"}), 401
-
-    data = request.json
-    playlist_description = data.get('description', '')
-    
-    if not playlist_description:
-        return jsonify({"error": "Playlist description is required"}), 400
-
-    user_id = session['spotify_user_id']
-    access_token = session['access_token']
-
-    # Generate song suggestions using OpenAI
     try:
-        prompt = f"Generate a list of 10 songs for this playlist idea:\n{playlist_description}\n\nFormat each song as 'Song Name by Artist'"
-        openai_response = openai.Completion.create(
-            model="text-davinci-003",
-            prompt=prompt,
-            max_tokens=150
-        )
+        # Check authentication
+        if 'token_info' not in session or 'user' not in session:
+            return jsonify({"error": "User not authenticated"}), 401
+
+        data = request.json
+        playlist_description = data.get('description', '')
         
-        song_list = [line.strip() for line in openai_response.choices[0].text.strip().split('\n') if line.strip()]
+        if not playlist_description:
+            return jsonify({"error": "Playlist description is required"}), 400
+
+        # Get Spotify client with valid token
+        sp = get_spotify_client()
         
-        # Search for tracks on Spotify
-        track_uris = []
-        tracks = []
-        
-        for song in song_list:
-            search_url = "https://api.spotify.com/v1/search"
-            headers = {"Authorization": f"Bearer {access_token}"}
-            params = {"q": song, "type": "track", "limit": 1}
+        # Generate song suggestions using OpenAI
+        try:
+            prompt = f"Generate a list of 10 songs for this playlist idea:\n{playlist_description}\n\nFormat each song as 'Song Name by Artist'"
+            openai_response = openai.Completion.create(
+                model="text-davinci-003",
+                prompt=prompt,
+                max_tokens=150
+            )
             
-            res = requests.get(search_url, headers=headers, params=params)
-            if res.status_code == 200:
-                search_results = res.json()
-                items = search_results.get('tracks', {}).get('items', [])
-                if items:
-                    track = items[0]
-                    track_uris.append(track['uri'])
-                    tracks.append({
-                        'name': track['name'],
-                        'artist': track['artists'][0]['name'],
-                        'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
-                    })
-
-        # Create playlist
-        create_playlist_url = f"https://api.spotify.com/v1/users/{user_id}/playlists"
-        payload = {
-            "name": f"AI Generated: {playlist_description[:30]}...",
-            "description": f"Generated by Moosic AI based on: {playlist_description}",
-            "public": False
-        }
-        
-        create_res = requests.post(
-            create_playlist_url,
-            headers={"Authorization": f"Bearer {access_token}"},
-            json=payload
-        )
-        
-        if create_res.status_code != 201:
-            return jsonify({"error": "Failed to create playlist"}), 400
+            song_list = [line.strip() for line in openai_response.choices[0].text.strip().split('\n') if line.strip()]
             
-        playlist_data = create_res.json()
-        playlist_id = playlist_data['id']
+            # Search for tracks on Spotify
+            track_uris = []
+            tracks = []
+            
+            for song in song_list:
+                search_url = "https://api.spotify.com/v1/search"
+                headers = {"Authorization": f"Bearer {session['token_info']['access_token']}"}
+                params = {"q": song, "type": "track", "limit": 1}
+                
+                res = requests.get(search_url, headers=headers, params=params)
+                if res.status_code == 200:
+                    search_results = res.json()
+                    items = search_results.get('tracks', {}).get('items', [])
+                    if items:
+                        track = items[0]
+                        track_uris.append(track['uri'])
+                        tracks.append({
+                            'name': track['name'],
+                            'artist': track['artists'][0]['name'],
+                            'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
+                        })
 
-        # Add tracks to playlist
-        add_tracks_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
-        add_payload = {"uris": track_uris}
-        
-        add_res = requests.post(
-            add_tracks_url,
-            headers={"Authorization": f"Bearer {access_token}"},
-            json=add_payload
-        )
-        
-        if add_res.status_code != 201:
-            return jsonify({"error": "Failed to add tracks to playlist"}), 400
+            # Create playlist
+            create_playlist_url = f"https://api.spotify.com/v1/users/{session['user']['id']}/playlists"
+            payload = {
+                "name": f"AI Generated: {playlist_description[:30]}...",
+                "description": f"Generated by Moosic AI based on: {playlist_description}",
+                "public": False
+            }
+            
+            create_res = requests.post(
+                create_playlist_url,
+                headers={"Authorization": f"Bearer {session['token_info']['access_token']}"},
+                json=payload
+            )
+            
+            if create_res.status_code != 201:
+                logger.error(f"Failed to create playlist: {create_res.status_code} - {create_res.text}")
+                return jsonify({"error": "Failed to create playlist"}), 400
+                
+            playlist_data = create_res.json()
+            playlist_id = playlist_data['id']
 
-        return jsonify({
-            "success": True,
-            "playlist_url": playlist_data['external_urls']['spotify'],
-            "playlist_name": playlist_data['name'],
-            "tracks": tracks
-        })
+            # Add tracks to playlist
+            add_tracks_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+            add_payload = {"uris": track_uris}
+            
+            add_res = requests.post(
+                add_tracks_url,
+                headers={"Authorization": f"Bearer {session['token_info']['access_token']}"},
+                json=add_payload
+            )
+            
+            if add_res.status_code != 201:
+                logger.error(f"Failed to add tracks: {add_res.status_code} - {add_res.text}")
+                return jsonify({"error": "Failed to add tracks to playlist"}), 400
+
+            return jsonify({
+                "success": True,
+                "playlist_url": playlist_data['external_urls']['spotify'],
+                "playlist_name": playlist_data['name'],
+                "tracks": tracks
+            })
+
+        except Exception as e:
+            logger.error(f"Error in playlist generation: {str(e)}")
+            return jsonify({"error": str(e)}), 500
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error in generate-playlist route: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
 
 def retry_with_backoff(func, max_retries=3, initial_delay=1):
     """Retry a function with exponential backoff"""
