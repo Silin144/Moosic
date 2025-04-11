@@ -97,7 +97,8 @@ sp_oauth = SpotifyOAuth(
     client_id=os.getenv('SPOTIFY_CLIENT_ID'),
     client_secret=os.getenv('SPOTIFY_CLIENT_SECRET'),
     redirect_uri=os.getenv('SPOTIFY_REDIRECT_URI'),
-    scope='playlist-modify-public playlist-modify-private user-read-private user-read-email'
+    scope='playlist-modify-public playlist-modify-private user-read-private user-read-email',
+    state='moosic_state'  # Add state parameter for security
 )
 
 def get_spotify_client():
@@ -112,27 +113,42 @@ def get_spotify_client():
     is_expired = token_info['expires_at'] - now < 60  # Refresh if less than 60 seconds left
     
     if is_expired:
-        logger.info('Token expired, refreshing...')
-        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-        session['token_info'] = token_info
+        try:
+            logger.info('Token expired, refreshing...')
+            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+            session['token_info'] = token_info
+            session.modified = True
+        except Exception as e:
+            logger.error(f"Error refreshing token: {str(e)}")
+            session.clear()
+            raise Exception('Failed to refresh token')
     
     return spotipy.Spotify(auth=token_info['access_token'])
 
 @app.route('/api/login')
 def login():
-    scope = "user-read-email playlist-modify-public playlist-modify-private"
-    spotify_auth_url = (
-        "https://accounts.spotify.com/authorize"
-        f"?response_type=code&client_id={os.getenv('SPOTIFY_CLIENT_ID')}"
-        f"&scope={scope}"
-        f"&redirect_uri={os.getenv('SPOTIFY_REDIRECT_URI')}"
-    )
-    return redirect(spotify_auth_url)
+    try:
+        # Generate state parameter
+        state = 'moosic_state'
+        session['oauth_state'] = state
+        
+        # Get authorization URL
+        auth_url = sp_oauth.get_authorize_url(state=state)
+        return redirect(auth_url)
+    except Exception as e:
+        logger.error(f"Error in login route: {str(e)}")
+        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20initialize%20login")
 
 @app.route('/api/callback')
 def callback():
     code = request.args.get('code')
     error = request.args.get('error')
+    state = request.args.get('state')
+    
+    # Verify state parameter
+    if state != session.get('oauth_state'):
+        logger.error("State parameter mismatch")
+        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Invalid%20state%20parameter")
     
     if error:
         logger.error(f"Spotify auth error: {error}")
@@ -143,47 +159,30 @@ def callback():
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20authorization%20code%20received")
 
     try:
-        # Exchange code for tokens
-        token_url = 'https://accounts.spotify.com/api/token'
-        response = requests.post(
-            token_url,
-            data={
-                'grant_type': 'authorization_code',
-                'code': code,
-                'redirect_uri': os.environ['SPOTIFY_REDIRECT_URI'],
-                'client_id': os.environ['SPOTIFY_CLIENT_ID'],
-                'client_secret': os.environ['SPOTIFY_CLIENT_SECRET']
-            },
-            headers={
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        )
-
-        if response.status_code != 200:
-            logger.error(f"Token exchange failed: {response.status_code} - {response.text}")
-            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20exchange%20code%20for%20tokens")
-
-        token_data = response.json()
-        session['access_token'] = token_data['access_token']
-        session['refresh_token'] = token_data['refresh_token']
-        session['token_expires_at'] = int(time.time()) + token_data['expires_in']
+        # Exchange code for tokens using spotipy
+        token_info = sp_oauth.get_access_token(code)
         
-        # Get user info
-        user_info_res = requests.get(
-            'https://api.spotify.com/v1/me',
-            headers={"Authorization": f"Bearer {token_data['access_token']}"}
-        )
+        # Store token info in session
+        session['token_info'] = {
+            'access_token': token_info['access_token'],
+            'refresh_token': token_info['refresh_token'],
+            'expires_at': int(time.time()) + token_info['expires_in']
+        }
         
-        if user_info_res.status_code != 200:
-            logger.error(f"Failed to get user info: {user_info_res.status_code} - {user_info_res.text}")
-            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20user%20info")
+        # Get user info using spotipy
+        sp = spotipy.Spotify(auth=token_info['access_token'])
+        user_info = sp.current_user()
+        
+        session['user'] = {
+            'id': user_info.get('id'),
+            'name': user_info.get('display_name'),
+            'email': user_info.get('email'),
+            'image': user_info.get('images', [{}])[0].get('url') if user_info.get('images') else None
+        }
 
-        user_info = user_info_res.json()
-        session['spotify_user_id'] = user_info.get('id')
-        session['user_name'] = user_info.get('display_name')
-        session['user_email'] = user_info.get('email')
-        session['user_image'] = user_info.get('images', [{}])[0].get('url') if user_info.get('images') else None
-
+        # Force session to be saved
+        session.modified = True
+        
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=success")
 
     except Exception as e:
@@ -192,15 +191,44 @@ def callback():
 
 @app.route('/api/check-auth')
 def check_auth():
-    if 'access_token' in session and 'spotify_user_id' in session:
+    if 'token_info' in session and 'user' in session:
+        # Check if token is expired
+        if time.time() > session['token_info']['expires_at']:
+            try:
+                # Refresh the token
+                token_url = 'https://accounts.spotify.com/api/token'
+                response = requests.post(
+                    token_url,
+                    data={
+                        'grant_type': 'refresh_token',
+                        'refresh_token': session['token_info']['refresh_token'],
+                        'client_id': os.environ['SPOTIFY_CLIENT_ID'],
+                        'client_secret': os.environ['SPOTIFY_CLIENT_SECRET']
+                    },
+                    headers={
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                )
+                
+                if response.status_code == 200:
+                    token_data = response.json()
+                    session['token_info'] = {
+                        'access_token': token_data['access_token'],
+                        'refresh_token': session['token_info']['refresh_token'],  # Keep the same refresh token
+                        'expires_at': int(time.time()) + token_data['expires_in']
+                    }
+                    session.modified = True
+                else:
+                    session.clear()
+                    return jsonify({"authenticated": False})
+            except Exception as e:
+                logger.error(f"Error refreshing token: {str(e)}")
+                session.clear()
+                return jsonify({"authenticated": False})
+        
         return jsonify({
             "authenticated": True,
-            "user": {
-                "id": session.get('spotify_user_id'),
-                "name": session.get('user_name'),
-                "email": session.get('user_email'),
-                "image": session.get('user_image')
-            }
+            "user": session['user']
         })
     return jsonify({"authenticated": False})
 
