@@ -139,39 +139,36 @@ def callback():
     try:
         code = request.args.get('code')
         if not code:
-            logger.warning("No code received in callback")
-            return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=no_code")
+            return jsonify({'error': 'No code provided'}), 400
 
-        # Clear any existing session data before setting new one
-        session.clear()
-        logger.info("Cleared existing session data in callback")
-        
-        # Get token info
-        token_info = sp_oauth.get_access_token(code)
-        if not token_info:
-            logger.error("Failed to get access token")
-            return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error=token_failed")
+        # Exchange code for access token
+        token_data = sp_oauth.get_access_token(code)
+        if not token_data:
+            return jsonify({'error': 'Failed to get access token'}), 400
 
-        # Store token info in session
-        session['token_info'] = token_info
-        session.permanent = True
+        # Store token in session
+        session['token_info'] = token_data
 
-        # Get user info to verify
-        sp = spotipy.Spotify(auth=token_info['access_token'])
+        # Get user info
+        sp = spotipy.Spotify(auth=token_data['access_token'])
         user_info = sp.current_user()
         
-        # Log the user info for debugging
-        logger.info(f"User authenticated: {user_info['id']} ({user_info['email']})")
-        logger.info(f"User display name: {user_info['display_name']}")
-        
-        session['user_id'] = user_info['id']
-        session['user_info'] = user_info
+        # Store user info in session
+        session['user_info'] = {
+            'id': user_info['id'],
+            'display_name': user_info['display_name'],
+            'email': user_info.get('email', ''),
+            'image_url': user_info['images'][0]['url'] if user_info['images'] else None
+        }
 
-        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?from=spotify")
+        # Redirect to frontend with success message
+        frontend_url = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app')
+        return redirect(f"{frontend_url}?auth=success")
+
     except Exception as e:
-        logger.error(f"Error in callback: {str(e)}")
-        session.clear()
-        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={str(e)}")
+        print(f"Error in callback: {str(e)}")
+        frontend_url = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app')
+        return redirect(f"{frontend_url}?auth=error&message={str(e)}")
 
 @app.route('/api/check-auth')
 def check_auth():

@@ -16,6 +16,7 @@ import {
 } from '@mui/material'
 import { useAuth } from '../contexts/AuthContext'
 import { motion } from 'framer-motion'
+import { styled } from '@mui/material/styles'
 
 interface Track {
   name: string
@@ -29,6 +30,29 @@ interface PlaylistPreview {
   tracks: Track[]
   url: string
 }
+
+const PreviewCard = styled(Card)(({ theme }) => ({
+  background: 'rgba(255, 255, 255, 0.05)',
+  backdropFilter: 'blur(10px)',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  borderRadius: 16,
+  transition: 'transform 0.3s ease-in-out',
+  '&:hover': {
+    transform: 'translateY(-8px)',
+    boxShadow: '0 12px 24px rgba(29, 185, 84, 0.2)',
+  },
+}))
+
+const TrackItem = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  padding: theme.spacing(2),
+  borderRadius: 8,
+  transition: 'background-color 0.2s ease-in-out',
+  '&:hover': {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+}))
 
 const GeneratePlaylist: React.FC = () => {
   const { isAuthenticated } = useAuth()
@@ -190,26 +214,55 @@ const GeneratePlaylist: React.FC = () => {
         )}
 
         {preview && (
-          <Grow in={true}>
-            <Card sx={{ 
-              mb: 4, 
-              borderRadius: 4,
-              overflow: 'hidden',
-              background: 'rgba(255, 255, 255, 0.05)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
-              <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.paper' }}>
-                <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
-                  {preview.name}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <PreviewCard>
+              <CardContent>
+                <Typography variant="h5" gutterBottom>
+                  Playlist Preview
                 </Typography>
-                <Typography variant="body1" color="text.secondary" paragraph>
+                <Typography variant="body2" color="text.secondary" paragraph>
                   {preview.description}
                 </Typography>
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
+                <Box sx={{ mt: 2 }}>
+                  {preview.tracks.map((track, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                    >
+                      <TrackItem>
+                        {track.image && (
+                          <Box sx={{ mr: 2 }}>
+                            <img
+                              src={track.image}
+                              alt={track.name}
+                              style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 4,
+                                objectFit: 'cover',
+                              }}
+                            />
+                          </Box>
+                        )}
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle1">
+                            {track.name}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {track.artist}
+                          </Typography>
+                        </Box>
+                      </TrackItem>
+                    </motion.div>
+                  ))}
+                </Box>
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
                   <Button
                     variant="contained"
                     href={preview.url}
@@ -220,67 +273,21 @@ const GeneratePlaylist: React.FC = () => {
                       '&:hover': {
                         background: 'linear-gradient(45deg, #1ED760 30%, #1DB954 90%)',
                       },
+                      py: 1.5,
+                      px: 4,
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
                       borderRadius: 2,
                       textTransform: 'none',
-                      fontWeight: 'bold'
+                      boxShadow: '0 4px 14px 0 rgba(29, 185, 84, 0.39)'
                     }}
                   >
                     Open in Spotify
                   </Button>
-                </motion.div>
-              </Box>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                  Preview Tracks
-                </Typography>
-                <Box sx={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: { 
-                    xs: '1fr', 
-                    sm: '1fr 1fr', 
-                    md: '1fr 1fr 1fr' 
-                  }, 
-                  gap: 3 
-                }}>
-                  {preview.tracks.map((track, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <Card sx={{ 
-                        height: '100%', 
-                        display: 'flex', 
-                        flexDirection: 'column',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: 2,
-                        overflow: 'hidden'
-                      }}>
-                        <CardMedia
-                          component="img"
-                          height="140"
-                          image={track.image}
-                          alt={track.name}
-                          sx={{ objectFit: 'cover' }}
-                        />
-                        <CardContent sx={{ flexGrow: 1 }}>
-                          <Typography gutterBottom variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
-                            {track.name}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {track.artist}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
                 </Box>
               </CardContent>
-            </Card>
-          </Grow>
+            </PreviewCard>
+          </motion.div>
         )}
 
         <Snackbar
