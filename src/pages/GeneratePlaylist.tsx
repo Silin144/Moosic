@@ -45,6 +45,7 @@ import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import PauseIcon from '@mui/icons-material/Pause'
+import LockIcon from '@mui/icons-material/Lock'
 
 interface Track {
   name: string
@@ -82,6 +83,7 @@ const GeneratePlaylist: React.FC = () => {
   const [loadingTopTracks, setLoadingTopTracks] = useState(false)
   const [topTracksError, setTopTracksError] = useState<string | null>(null)
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null)
+  const [needsReauth, setNeedsReauth] = useState(false)
 
   // Check auth status only once when component mounts
   React.useEffect(() => {
@@ -106,10 +108,25 @@ const GeneratePlaylist: React.FC = () => {
       try {
         setLoadingTopTracks(true);
         setTopTracksError(null);
+        setNeedsReauth(false);
         
         const response = await fetchWithAuth(`${import.meta.env.VITE_API_URL}/api/user/top-tracks`);
         
         if (!response.ok) {
+          // If we get a 401 or 403, handle accordingly
+          if (response.status === 401 || response.status === 403) {
+            setTopTracks([]);
+            // Check error details
+            const data = await response.json();
+            if (data.code === 'insufficient_scope' || 
+                (data.error && (
+                  data.error.includes('Insufficient client scope') || 
+                  data.error.includes('reauthorize')
+                ))) {
+              setNeedsReauth(true);
+            }
+            return;
+          }
           throw new Error('Failed to fetch top tracks');
         }
         
@@ -117,7 +134,10 @@ const GeneratePlaylist: React.FC = () => {
         setTopTracks(data.tracks || []);
       } catch (err) {
         console.error('Error fetching top tracks:', err);
-        setTopTracksError(err instanceof Error ? err.message : 'Failed to fetch top tracks');
+        // Don't set error state for auth errors - just treat as empty tracks
+        if (err instanceof Error && !err.message.includes('authenticated')) {
+          setTopTracksError(err instanceof Error ? err.message : 'Failed to fetch top tracks');
+        }
       } finally {
         setLoadingTopTracks(false);
       }
@@ -215,6 +235,12 @@ const GeneratePlaylist: React.FC = () => {
     }
   }
 
+  // Function to handle reauthorization
+  const handleReauthorize = () => {
+    // Clear session and redirect to auth page
+    navigate('/auth');
+  };
+
   if (!isAuthenticated) {
     return (
       <Box
@@ -299,6 +325,47 @@ const GeneratePlaylist: React.FC = () => {
             </Typography>
           </motion.div>
         </Box>
+
+        {/* Re-authorization notice - show only when needed */}
+        {!playlistPreview && needsReauth && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                p: 4, 
+                background: alpha(theme.palette.background.paper, 0.8),
+                backdropFilter: 'blur(10px)',
+                borderRadius: 4,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                maxWidth: '900px',
+                mx: 'auto',
+                mb: 6
+              }}
+            >
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <LockIcon color="primary" sx={{ fontSize: 60, mb: 2 }} />
+                <Typography variant="h5" fontWeight="600" gutterBottom>
+                  Additional Permissions Needed
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: '600px' }}>
+                  To view your top tracks, we need additional Spotify permissions. Please reauthorize the app to enable this feature.
+                </Typography>
+                <Button
+                  variant="contained"
+                  onClick={handleReauthorize}
+                  startIcon={<SpotifyIcon />}
+                  sx={{ px: 4 }}
+                >
+                  Reauthorize with Spotify
+                </Button>
+              </Box>
+            </Paper>
+          </motion.div>
+        )}
 
         {/* Top Tracks Section - show only when no playlist is being previewed */}
         {!playlistPreview && topTracks.length > 0 && (

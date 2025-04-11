@@ -846,7 +846,16 @@ def get_top_tracks():
         sp = get_spotify_client()
         
         # Get user's top tracks (short_term = ~4 weeks, medium_term = ~6 months, long_term = several years)
-        top_tracks_response = sp.current_user_top_tracks(limit=20, time_range='medium_term')
+        try:
+            top_tracks_response = sp.current_user_top_tracks(limit=20, time_range='medium_term')
+        except spotipy.SpotifyException as spotify_err:
+            logger.error(f"Spotify API error: {spotify_err}")
+            if "Insufficient client scope" in str(spotify_err):
+                return jsonify({
+                    'error': 'Insufficient client scope. Please reauthorize the application with the required permissions.',
+                    'code': 'insufficient_scope'
+                }), 403
+            return jsonify({'error': str(spotify_err)}), 401
         
         tracks = []
         for item in top_tracks_response['items']:
