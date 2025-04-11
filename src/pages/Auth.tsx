@@ -105,6 +105,41 @@ const Auth: React.FC = () => {
     }
   }
 
+  useEffect(() => {
+    const handleCallback = async () => {
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
+      const error = params.get('error')
+      
+      if (error) {
+        setAuthStatus('error')
+        setError(error)
+        return
+      }
+      
+      if (code) {
+        try {
+          // Get the code verifier from localStorage
+          const codeVerifier = localStorage.getItem('code_verifier')
+          if (!codeVerifier) {
+            throw new Error('No code verifier found')
+          }
+          
+          // Add code verifier to the callback URL
+          const callbackUrl = new URL(window.location.href)
+          callbackUrl.searchParams.set('code_verifier', codeVerifier)
+          window.location.href = callbackUrl.toString()
+        } catch (err) {
+          console.error('Callback error:', err)
+          setAuthStatus('error')
+          setError('Failed to handle callback')
+        }
+      }
+    }
+    
+    handleCallback()
+  }, [])
+
   if (authStatus === 'checking') {
     return (
       <Box

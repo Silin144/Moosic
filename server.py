@@ -171,11 +171,18 @@ def callback():
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20authorization%20code%20received")
 
     try:
+        # Get code verifier from frontend
+        code_verifier = request.args.get('code_verifier')
+        if not code_verifier:
+            logger.error("No code verifier provided")
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20code%20verifier%20provided")
+
         # Exchange code for tokens using spotipy with PKCE
         token_info = sp_oauth.get_access_token(
             code,
             as_dict=False,
-            check_cache=False
+            check_cache=False,
+            code_verifier=code_verifier
         )
         
         if not token_info:
