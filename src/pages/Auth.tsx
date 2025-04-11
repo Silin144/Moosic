@@ -29,9 +29,9 @@ const Auth: React.FC = () => {
   // Define handleLogin with useCallback to memoize it
   const handleLogin = useCallback(async (forcePermissionsParam?: boolean) => {
     try {
-      // Clear any existing session data
-      localStorage.removeItem('code_verifier')
-      sessionStorage.removeItem('state')
+      // Clean up storage completely
+      localStorage.clear();
+      sessionStorage.clear();
       
       // Get the force_permissions parameter from props or URL
       const params = new URLSearchParams(location.search)
@@ -52,6 +52,9 @@ const Auth: React.FC = () => {
       const state = generateRandomString(16)
       sessionStorage.setItem('state', state)
       
+      // Notify console about starting auth flow
+      console.log('Starting Spotify authorization flow with scopes: playlist-modify-public playlist-modify-private user-read-private user-read-email user-top-read')
+      
       // Build authorization URL
       const authParams = new URLSearchParams({
         client_id: import.meta.env.VITE_SPOTIFY_CLIENT_ID || '',
@@ -63,10 +66,8 @@ const Auth: React.FC = () => {
         scope: 'playlist-modify-public playlist-modify-private user-read-private user-read-email user-top-read'
       })
       
-      // If force_permissions is true, always show the permissions dialog
-      if (forcePermissions) {
-        authParams.append('show_dialog', 'true')
-      }
+      // Always show the dialog to ensure users see what permissions they're granting
+      authParams.append('show_dialog', 'true')
       
       window.location.href = `https://accounts.spotify.com/authorize?${authParams.toString()}`
     } catch (err) {

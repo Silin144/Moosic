@@ -203,7 +203,7 @@ def login():
             'scope': 'playlist-modify-public playlist-modify-private user-read-private user-read-email user-top-read',
             'code_challenge_method': code_challenge_method,
             'code_challenge': code_challenge,
-            'show_dialog': 'true'
+            'show_dialog': 'true'  # Always show dialog for better user experience
         }
         
         auth_url = f"{auth_url}?{urllib.parse.urlencode(params)}"
@@ -271,6 +271,9 @@ def callback():
         if code_verifier:
             logger.info(f"Received code_verifier: {code_verifier[:10]}...")
 
+        # Clear any existing session first to prevent conflicts
+        session.clear()
+        
         # Exchange code for tokens using spotipy with PKCE
         try:
             # Manual token exchange using requests since SpotifyOAuth doesn't support PKCE
@@ -344,6 +347,9 @@ def callback():
             'image': user_info.get('images', [{}])[0].get('url') if user_info.get('images') else None
         }
 
+        # Add key to verify session is valid
+        session['authenticated'] = True
+        
         # Force session to be saved
         session.modified = True
         
@@ -351,10 +357,19 @@ def callback():
         logger.info(f"User {user_info.get('id')} authenticated successfully")
         logger.info(f"Session keys after auth: {list(session.keys())}")
         
-        if request.method == 'POST':
-            return jsonify({"status": "success", "user": session['user']})
-        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=success")
-
+        # Set a specific cookie to help with session persistence
+        response = jsonify({"status": "success", "user": session['user']}) if request.method == 'POST' else redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=success")
+        response.set_cookie(
+            app.config['SESSION_COOKIE_NAME'],
+            session.sid if hasattr(session, 'sid') else 'session-active',
+            max_age=86400,  # 24 hours
+            secure=True,
+            httponly=True,
+            samesite='None',
+            path='/'
+        )
+        
+        return response
     except Exception as e:
         logger.error(f"Unexpected error in callback: {str(e)}")
         if request.method == 'POST':
@@ -368,8 +383,10 @@ def check_auth():
         logger.info(f"Session cookie name: {app.config['SESSION_COOKIE_NAME']}")
         logger.info(f"Session ID: {session.sid if hasattr(session, 'sid') else 'No session ID'}")
         
-        if 'token_info' in session and 'user' in session:
-            logger.info("Found token_info and user in session")
+        # First, check if we have the authenticated flag and user data
+        if 'authenticated' in session and 'user' in session and 'token_info' in session:
+            logger.info("Found authenticated flag and user in session")
+            
             # Check if token is expired
             if time.time() > session['token_info']['expires_at']:
                 logger.info("Token is expired, attempting to refresh")
@@ -398,37 +415,74 @@ def check_auth():
                         }
                         session.modified = True
                         logger.info("Successfully refreshed token")
+                        
+                        # Update session cookie 
+                        resp = jsonify({"authenticated": True, "user": session['user']})
+                        resp.set_cookie(
+                            app.config['SESSION_COOKIE_NAME'],
+                            session.sid if hasattr(session, 'sid') else 'session-active',
+                            max_age=86400,  # 24 hours
+                            secure=True,
+                            httponly=True,
+                            samesite='None',
+                            path='/'
+                        )
+                        return resp
                     else:
-                        logger.error(f"Token refresh failed: {response.status_code} - {response.text}")
+                        logger.error(f"Error refreshing token: {response.status_code} - {response.text}")
+                        # If refresh fails, session is invalid
                         session.clear()
-                        return jsonify({"authenticated": False, "reason": "token_refresh_failed"})
+                        return jsonify({"authenticated": False, "reason": "Token refresh failed"})
                 except Exception as e:
-                    logger.error(f"Error refreshing token: {str(e)}")
+                    logger.error(f"Exception during token refresh: {str(e)}")
+                    # If refresh fails, session is invalid
                     session.clear()
-                    return jsonify({"authenticated": False, "reason": "token_refresh_error"})
+                    return jsonify({"authenticated": False, "reason": "Token refresh failed"})
             
-            logger.info(f"Returning authenticated=True with user {session['user'].get('id')}")
-            return jsonify({
-                "authenticated": True,
-                "user": session['user']
-            })
-        
-        logger.warning(f"No valid session found. Session keys: {list(session.keys())}")
-        return jsonify({"authenticated": False, "reason": "no_valid_session"})
+            # Update session cookie 
+            resp = jsonify({"authenticated": True, "user": session['user']})
+            resp.set_cookie(
+                app.config['SESSION_COOKIE_NAME'],
+                session.sid if hasattr(session, 'sid') else 'session-active',
+                max_age=86400,  # 24 hours
+                secure=True,
+                httponly=True,
+                samesite='None',
+                path='/'
+            )
+            return resp
+        else:
+            logger.warning(f"No valid session found. Session keys: {list(session.keys())}")
+            return jsonify({"authenticated": False, "reason": "No session"})
     except Exception as e:
-        logger.error(f"Error in check-auth: {str(e)}")
-        return jsonify({"authenticated": False, "reason": "general_error", "error": str(e)})
+        logger.error(f"Error checking authentication: {str(e)}")
+        return jsonify({"authenticated": False, "reason": str(e)})
 
 @app.route('/api/logout')
 def logout():
-    # Clear session data
-    session.clear()
-    
-    # Redirect to auth page with special parameter to force re-auth
-    return jsonify({
-        "success": True,
-        "message": "Successfully logged out"
-    })
+    try:
+        logger.info(f"Logging out user. Session keys before logout: {list(session.keys())}")
+        # Clear session data
+        session.clear()
+        session.modified = True
+        
+        # Add specific cleanup for cookies
+        response = jsonify({
+            "success": True,
+            "message": "Successfully logged out"
+        })
+        
+        # Explicitly expire the session cookie
+        response.set_cookie(app.config['SESSION_COOKIE_NAME'], '', expires=0, 
+                           secure=True, httponly=True, samesite='None', path='/')
+        
+        return response
+    except Exception as e:
+        logger.error(f"Error during logout: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"Error during logout: {str(e)}"
+        }), 500
 
 @app.route('/api/me')
 def get_me():

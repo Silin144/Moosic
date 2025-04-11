@@ -239,14 +239,25 @@ const GeneratePlaylist: React.FC = () => {
   const handleReauthorize = async () => {
     try {
       // First, log out the user from the backend
-      await fetchWithAuth(`${import.meta.env.VITE_API_URL}/api/logout`);
+      const response = await fetchWithAuth(`${import.meta.env.VITE_API_URL}/api/logout`);
       
-      // Then redirect to auth page with special parameter to force permission prompt
-      navigate('/auth?force_permissions=true');
+      if (!response.ok) {
+        throw new Error('Logout failed');
+      }
+      
+      // Clear any local storage that might be related to authentication
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Small delay to ensure backend processes the logout
+      setTimeout(() => {
+        // Then redirect to auth page with special parameter to force permission prompt
+        window.location.href = '/auth?force_permissions=true';
+      }, 500);
     } catch (error) {
       console.error('Error during reauthorization:', error);
-      // If the logout fails, just redirect to auth page with parameter
-      navigate('/auth?force_permissions=true');
+      // If the logout fails, still try to redirect
+      window.location.href = '/auth?force_permissions=true';
     }
   };
 
