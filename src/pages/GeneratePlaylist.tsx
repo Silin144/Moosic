@@ -34,6 +34,15 @@ import ShareIcon from '@mui/icons-material/Share'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import AlbumIcon from '@mui/icons-material/Album'
 import AudiotrackIcon from '@mui/icons-material/Audiotrack'
+import MoreVertIcon from '@mui/icons-material/MoreVert'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import SlideshowIcon from '@mui/icons-material/Slideshow'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import ListItemIcon from '@mui/material/ListItemIcon'
+import ListItemText from '@mui/material/ListItemText'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 
 interface Track {
   name: string
@@ -57,6 +66,8 @@ const GeneratePlaylist: React.FC = () => {
   const [playlistPreview, setPlaylistPreview] = useState<PlaylistPreview | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const [hoverTrack, setHoverTrack] = useState<number | null>(null)
 
   // Check auth status only once when component mounts
   React.useEffect(() => {
@@ -121,6 +132,22 @@ const GeneratePlaylist: React.FC = () => {
     setDescription('');
   }
 
+  const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget)
+  }
+
+  const handleMenuClose = () => {
+    setAnchorEl(null)
+  }
+
+  const copyPlaylistLink = () => {
+    if (playlistPreview?.playlist_url) {
+      navigator.clipboard.writeText(playlistPreview.playlist_url)
+      setShowSuccess(true)
+      handleMenuClose()
+    }
+  }
+
   if (!isAuthenticated) {
     return (
       <Box
@@ -146,7 +173,21 @@ const GeneratePlaylist: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 6 }}>
+    <Container maxWidth="xl" sx={{ 
+      py: 6,
+      position: 'relative',
+      '&::before': {
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        backgroundImage: 'radial-gradient(circle at 20% 70%, rgba(29, 185, 84, 0.05) 0%, transparent 50%), radial-gradient(circle at 80% 40%, rgba(29, 185, 84, 0.03) 0%, transparent 60%)',
+        pointerEvents: 'none',
+        zIndex: -1,
+      }
+    }}>
       <Box sx={{ 
         mb: 6, 
         textAlign: 'center',
@@ -371,16 +412,17 @@ const GeneratePlaylist: React.FC = () => {
                       <ShareIcon />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Add to Favorites">
+                  <Tooltip title="More Options">
                     <IconButton 
                       color="primary" 
                       size="large"
+                      onClick={handleMenuOpen}
                       sx={{ 
                         bgcolor: alpha(theme.palette.primary.main, 0.1),
                         '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }
                       }}
                     >
-                      <FavoriteIcon />
+                      <MoreVertIcon />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -406,14 +448,87 @@ const GeneratePlaylist: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: index * 0.05 }}
                     >
-                      <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                        <CardMedia
-                          component="img"
-                          height="200"
-                          image={track.album_image || 'https://via.placeholder.com/200?text=Album+Cover'}
-                          alt={track.name}
-                          sx={{ objectFit: 'cover' }}
-                        />
+                      <Card 
+                        sx={{ 
+                          height: '100%', 
+                          display: 'flex', 
+                          flexDirection: 'column',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          '&:hover': {
+                            '& .play-button': {
+                              opacity: 1,
+                              transform: 'translateY(0) scale(1)',
+                            }
+                          },
+                        }}
+                        onMouseEnter={() => setHoverTrack(index)}
+                        onMouseLeave={() => setHoverTrack(null)}
+                      >
+                        <Box sx={{ position: 'relative' }}>
+                          <CardMedia
+                            component="img"
+                            height="200"
+                            image={track.album_image || 'https://via.placeholder.com/200?text=Album+Cover'}
+                            alt={track.name}
+                            sx={{ objectFit: 'cover' }}
+                          />
+                          <Box 
+                            className="play-button"
+                            sx={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: 'rgba(0,0,0,0.5)',
+                              opacity: 0,
+                              transition: 'all 0.3s ease',
+                              transform: 'translateY(10px) scale(0.95)',
+                            }}
+                          >
+                            <IconButton
+                              sx={{
+                                bgcolor: 'primary.main',
+                                color: 'white',
+                                '&:hover': {
+                                  bgcolor: 'primary.dark',
+                                  transform: 'scale(1.1)',
+                                },
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              <PlayArrowIcon sx={{ fontSize: 36 }} />
+                            </IconButton>
+                          </Box>
+                          {hoverTrack === index && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 8,
+                                  right: 8,
+                                  bgcolor: 'rgba(0,0,0,0.6)',
+                                  borderRadius: '50%',
+                                }}
+                              >
+                                <IconButton
+                                  size="small"
+                                  sx={{ color: 'white' }}
+                                >
+                                  <MoreVertIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                            </motion.div>
+                          )}
+                        </Box>
                         <CardContent sx={{ flexGrow: 1, pb: 1 }}>
                           <Typography variant="h6" component="div" noWrap title={track.name}>
                             {track.name}
@@ -443,19 +558,45 @@ const GeneratePlaylist: React.FC = () => {
         </motion.div>
       )}
 
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem onClick={copyPlaylistLink}>
+          <ListItemIcon>
+            <ContentCopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Copy Playlist Link</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleMenuClose}>
+          <ListItemIcon>
+            <SlideshowIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Preview Playlist</ListItemText>
+        </MenuItem>
+      </Menu>
+
       <Snackbar
         open={showSuccess}
-        autoHideDuration={6000}
+        autoHideDuration={4000}
         onClose={() => setShowSuccess(false)}
         TransitionComponent={Fade}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert 
           elevation={6} 
           variant="filled" 
           severity="success" 
           onClose={() => setShowSuccess(false)}
+          sx={{ 
+            boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
+            '& .MuiAlert-icon': { fontSize: 20 } 
+          }}
         >
-          Playlist generated successfully!
+          {playlistPreview ? 'Link copied to clipboard!' : 'Playlist generated successfully!'}
         </Alert>
       </Snackbar>
     </Container>

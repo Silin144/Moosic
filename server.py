@@ -589,20 +589,23 @@ def generate_playlist():
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a professional music curator with extensive knowledge of music history, chart hits, and cultural trends across different time periods.
+                        "content": """You are a professional music curator with deep industry knowledge and expertise in music history, chart hits, and cultural trends across different time periods.
 
 Your task is to generate a list of 10 songs that perfectly match the provided playlist description.
 
-Follow these guidelines:
-1. For year or era-specific requests (e.g., '2016 vibes', '90s rock'), prioritize actual popular/charting songs from that exact time period.
-2. Suggest only original songs, NO parodies, karaoke, covers, tributes, or remixes unless specifically requested.
-3. Include well-known, high-quality songs that match the requested mood, theme, or era.
-4. Prioritize songs that were commercially successful or critically acclaimed during the specified period.
-5. Never include novelty songs, joke songs, or parodies unless explicitly requested.
-6. For year-specific requests, include only songs that were actually released or popular in that exact year.
-7. For decade requests (80s, 90s, etc.), include defining songs from that decade that best represent its sound.
-8. Ensure all suggestions are legitimate songs by real artists that can be found on Spotify.
-9. Format each song as 'Song Name by Artist Name'"""
+IMPORTANT RULES:
+1. NEVER suggest karaoke, covers, remixes, tributes, or "made famous by" versions of songs - STRICTLY ORIGINAL RECORDINGS ONLY.
+2. For year-specific requests (e.g., '2016 vibes'), use ONLY songs that were genuine chart hits or culturally significant during that EXACT year.
+3. For decade requests (e.g., '90s rock'), select DEFINING songs that best represent the authentic sound from that period.
+4. Prioritize tracks from major artists with significant streaming numbers on platforms like Spotify.
+5. Ensure variety in your selections - don't suggest multiple songs from the same artist.
+6. NEVER include novelty songs, parodies, joke songs, or low-quality tracks.
+7. Verify all suggested songs are legitimate tracks by established artists.
+8. For genre-specific requests, choose songs that are quintessential examples of that genre.
+9. For mood-based playlists, select songs that authentically evoke that specific emotional state.
+10. Format each song as 'Song Name by Artist Name' without any commentary.
+
+ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions."""
                     },
                     {
                         "role": "user",
@@ -616,7 +619,7 @@ Follow these guidelines:
             song_list = [line.strip() for line in completion.choices[0].message['content'].strip().split('\n') if line.strip()]
             logger.info(f"Generated song list: {song_list}")
             
-            # Search for tracks on Spotify
+            # Search for tracks on Spotify - add more specific search exclusions
             track_uris = []
             tracks = []
             
@@ -627,17 +630,31 @@ Follow these guidelines:
                     track_name = parts[0].strip()
                     artist_name = parts[1].strip()
                     
-                    # Search with artist and track parameters
+                    # Search with artist and track parameters - exclude karaoke versions explicitly
                     search_url = "https://api.spotify.com/v1/search"
                     headers = {"Authorization": f"Bearer {session['token_info']['access_token']}"}
-                    params = {"q": f"artist:{artist_name} track:{track_name}", "type": "track", "limit": 1}
+                    
+                    # First try searching with negative filters to exclude karaoke/tribute versions
+                    exclude_terms = "NOT karaoke NOT tribute NOT 'made famous' NOT cover NOT remake NOT instrumental"
+                    filtered_query = f"artist:\"{artist_name}\" track:\"{track_name}\" {exclude_terms}"
+                    params = {"q": filtered_query, "type": "track", "limit": 3}
                     
                     res = requests.get(search_url, headers=headers, params=params)
                     if res.status_code == 200:
                         search_results = res.json()
                         items = search_results.get('tracks', {}).get('items', [])
-                        if items:
-                            track = items[0]
+                        
+                        # Filter out any tracks with suspicious names indicating karaoke versions
+                        filtered_items = [
+                            item for item in items 
+                            if not any(keyword in item['name'].lower() for keyword in 
+                                      ['karaoke', 'tribute', 'cover', 'made famous', 'instrumental', 'remake'])
+                        ]
+                        
+                        if filtered_items:
+                            # Sort by popularity to get the most well-known version
+                            filtered_items.sort(key=lambda x: x.get('popularity', 0), reverse=True)
+                            track = filtered_items[0]
                             track_uris.append(track['uri'])
                             tracks.append({
                                 'name': track['name'],
@@ -649,14 +666,27 @@ Follow these guidelines:
                 # Fallback to general search if specific search failed or parsing failed
                 search_url = "https://api.spotify.com/v1/search"
                 headers = {"Authorization": f"Bearer {session['token_info']['access_token']}"}
-                params = {"q": song, "type": "track", "limit": 1}
+                
+                # Add exclusion terms to general search too
+                general_query = f"{song} NOT karaoke NOT tribute NOT cover"
+                params = {"q": general_query, "type": "track", "limit": 3}
                 
                 res = requests.get(search_url, headers=headers, params=params)
                 if res.status_code == 200:
                     search_results = res.json()
                     items = search_results.get('tracks', {}).get('items', [])
-                    if items:
-                        track = items[0]
+                    
+                    # Filter out suspicious tracks
+                    filtered_items = [
+                        item for item in items 
+                        if not any(keyword in item['name'].lower() for keyword in 
+                                  ['karaoke', 'tribute', 'cover', 'made famous', 'instrumental', 'remake'])
+                    ]
+                    
+                    if filtered_items:
+                        # Sort by popularity
+                        filtered_items.sort(key=lambda x: x.get('popularity', 0), reverse=True)
+                        track = filtered_items[0]
                         track_uris.append(track['uri'])
                         tracks.append({
                             'name': track['name'],
