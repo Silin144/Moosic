@@ -15,7 +15,9 @@ const Auth: React.FC = () => {
     const checkAuth = async () => {
       try {
         setAuthStatus('checking')
-        const response = await fetch('/api/check-auth')
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/check-auth`, {
+          credentials: 'include'
+        })
         const data = await response.json()
         
         if (data.authenticated) {
@@ -46,7 +48,7 @@ const Auth: React.FC = () => {
   }, [location, navigate, setIsAuthenticated])
 
   const handleLogin = () => {
-    window.location.href = '/api/login'
+    window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
   }
 
   if (authStatus === 'checking') {

@@ -122,103 +122,75 @@ def get_spotify_client():
 
 @app.route('/api/login')
 def login():
-    try:
-        # Clear any existing session data
-        session.clear()
-        logger.info("Cleared existing session data before login")
-        
-        auth_url = sp_oauth.get_authorize_url()
-        logger.info(f"Generated auth URL for new login attempt")
-        return redirect(auth_url)
-    except Exception as e:
-        logger.error(f"Error in login: {str(e)}")
-        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?error={str(e)}")
+    scope = "user-read-email playlist-modify-public playlist-modify-private"
+    spotify_auth_url = (
+        "https://accounts.spotify.com/authorize"
+        f"?response_type=code&client_id={os.getenv('SPOTIFY_CLIENT_ID')}"
+        f"&scope={scope}"
+        f"&redirect_uri={os.getenv('SPOTIFY_REDIRECT_URI')}"
+    )
+    return redirect(spotify_auth_url)
 
 @app.route('/api/callback')
 def callback():
-    try:
-        code = request.args.get('code')
-        if not code:
-            return jsonify({'error': 'No code provided'}), 400
+    code = request.args.get('code')
+    error = request.args.get('error')
+    
+    if error or not code:
+        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?auth=error&message=Spotify%20login%20failed")
 
-        # Exchange code for access token
-        token_data = sp_oauth.get_access_token(code)
-        if not token_data:
-            return jsonify({'error': 'Failed to get access token'}), 400
+    # Exchange code for tokens
+    token_url = 'https://accounts.spotify.com/api/token'
+    response = requests.post(token_url, data={
+        'grant_type': 'authorization_code',
+        'code': code,
+        'redirect_uri': os.getenv('SPOTIFY_REDIRECT_URI'),
+        'client_id': os.getenv('SPOTIFY_CLIENT_ID'),
+        'client_secret': os.getenv('SPOTIFY_CLIENT_SECRET')
+    })
 
-        # Store token in session
-        session['token_info'] = token_data
+    if response.status_code != 200:
+        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?auth=error&message=Failed%20to%20retrieve%20tokens")
 
-        # Get user info
-        sp = spotipy.Spotify(auth=token_data['access_token'])
-        user_info = sp.current_user()
-        
-        # Store user info in session
-        session['user_info'] = {
-            'id': user_info['id'],
-            'display_name': user_info['display_name'],
-            'email': user_info.get('email', ''),
-            'image_url': user_info['images'][0]['url'] if user_info['images'] else None
-        }
+    token_data = response.json()
+    session['access_token'] = token_data['access_token']
+    session['refresh_token'] = token_data['refresh_token']
+    
+    # Get user info
+    user_info_res = requests.get(
+        'https://api.spotify.com/v1/me',
+        headers={"Authorization": f"Bearer {token_data['access_token']}"}
+    )
+    
+    if user_info_res.status_code == 200:
+        user_info = user_info_res.json()
+        session['spotify_user_id'] = user_info.get('id')
+        session['user_name'] = user_info.get('display_name')
+        session['user_email'] = user_info.get('email')
+        session['user_image'] = user_info.get('images', [{}])[0].get('url')
+    else:
+        return redirect(f"{os.getenv('FRONTEND_URL')}/auth?auth=error&message=Failed%20to%20get%20user%20info")
 
-        # Redirect to frontend with success message
-        frontend_url = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app')
-        return redirect(f"{frontend_url}?auth=success")
-
-    except Exception as e:
-        print(f"Error in callback: {str(e)}")
-        frontend_url = os.getenv('FRONTEND_URL', 'https://moosic-liart.vercel.app')
-        return redirect(f"{frontend_url}?auth=error&message={str(e)}")
+    return redirect(f"{os.getenv('FRONTEND_URL')}/auth?auth=success")
 
 @app.route('/api/check-auth')
 def check_auth():
-    try:
-        token_info = session.get('token_info')
-        if not token_info:
-            logger.info("No token info in session during auth check")
-            return jsonify({'authenticated': False})
-
-        # Check if token is expired
-        now = int(time.time())
-        is_expired = token_info['expires_at'] - now < 60
-
-        if is_expired:
-            try:
-                logger.info("Token expired, attempting refresh")
-                token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-                session['token_info'] = token_info
-                logger.info("Token refreshed successfully")
-            except Exception as e:
-                logger.error(f'Error refreshing token: {e}')
-                session.clear()
-                return jsonify({'authenticated': False})
-
-        # Verify token is valid
-        sp = spotipy.Spotify(auth=token_info['access_token'])
-        current_user = sp.current_user()
-        
-        # Log the current user for debugging
-        logger.info(f"Checking auth for user: {current_user['id']} ({current_user['email']})")
-        logger.info(f"User display name: {current_user['display_name']}")
-        
-        # Verify session user matches token user
-        if current_user['id'] != session.get('user_id'):
-            logger.warning(f"User ID mismatch: session={session.get('user_id')}, token={current_user['id']}")
-            session.clear()
-            return jsonify({'authenticated': False})
-
+    if 'access_token' in session and 'spotify_user_id' in session:
         return jsonify({
-            'authenticated': True,
-            'user': {
-                'id': current_user['id'],
-                'display_name': current_user['display_name'],
-                'images': current_user['images']
+            "authenticated": True,
+            "user": {
+                "id": session.get('spotify_user_id'),
+                "name": session.get('user_name'),
+                "email": session.get('user_email'),
+                "image": session.get('user_image')
             }
         })
-    except Exception as e:
-        logger.error(f'Error checking auth: {e}')
-        session.clear()
-        return jsonify({'authenticated': False})
+    return jsonify({"authenticated": False})
+
+@app.route('/api/logout')
+def logout():
+    session.clear()
+    return redirect(f"{os.getenv('FRONTEND_URL')}/auth")
 
 @app.route('/api/me')
 def get_me():
@@ -329,92 +301,93 @@ def create_playlist():
 
 @app.route('/api/generate-playlist', methods=['POST'])
 def generate_playlist():
+    if 'access_token' not in session or 'spotify_user_id' not in session:
+        return jsonify({"error": "User not authenticated"}), 401
+
+    data = request.json
+    playlist_description = data.get('description', '')
+    
+    if not playlist_description:
+        return jsonify({"error": "Playlist description is required"}), 400
+
+    user_id = session['spotify_user_id']
+    access_token = session['access_token']
+
+    # Generate song suggestions using OpenAI
     try:
-        data = request.json
-        prompt = data.get('prompt')
-        if not prompt:
-            return jsonify({'error': 'No prompt provided'}), 400
-
-        # Get token from session
-        token_info = session.get('token_info')
-        if not token_info:
-            return jsonify({'error': 'Not authenticated'}), 401
-
-        # Verify the session user matches the token
-        sp = spotipy.Spotify(auth=token_info['access_token'])
-        current_user = sp.current_user()
-        if current_user['id'] != session.get('user_id'):
-            session.clear()  # Clear session if user mismatch
-            return jsonify({'error': 'Session mismatch'}), 401
-
-        # Initialize Spotify client
-        sp = spotipy.Spotify(auth=token_info['access_token'])
-
-        # Get user's Spotify ID
-        user_info = sp.current_user()
-        user_id = user_info['id']
-
-        # Generate playlist name and description using OpenAI
-        completion = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant that generates creative playlist names and descriptions."},
-                {"role": "user", "content": f"Generate a creative name and description for a playlist based on this prompt: {prompt}"}
-            ]
+        prompt = f"Generate a list of 10 songs for this playlist idea:\n{playlist_description}\n\nFormat each song as 'Song Name by Artist'"
+        openai_response = openai.Completion.create(
+            model="text-davinci-003",
+            prompt=prompt,
+            max_tokens=150
         )
-        response = completion.choices[0].message.content
-        name, description = response.split('\n', 1)
-
-        # Create playlist
-        playlist = sp.user_playlist_create(
-            user_id,
-            name.strip(),
-            public=True,
-            description=description.strip()
-        )
-
-        # Search for songs based on the prompt
-        completion = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant that suggests songs based on user prompts. Return only song names and artists in the format 'Song Name - Artist Name', one per line."},
-                {"role": "user", "content": f"Suggest 10 songs for a playlist based on this prompt: {prompt}"}
-            ]
-        )
-        song_suggestions = completion.choices[0].message.content.split('\n')
-
-        # Search for and add tracks to playlist
+        
+        song_list = [line.strip() for line in openai_response.choices[0].text.strip().split('\n') if line.strip()]
+        
+        # Search for tracks on Spotify
         track_uris = []
         tracks = []
-        for suggestion in song_suggestions:
-            if suggestion.strip():
-                try:
-                    results = sp.search(q=suggestion, type='track', limit=1)
-                    if results['tracks']['items']:
-                        track = results['tracks']['items'][0]
-                        track_uris.append(track['uri'])
-                        tracks.append({
-                            'name': track['name'],
-                            'artist': track['artists'][0]['name'],
-                            'image': track['album']['images'][0]['url'] if track['album']['images'] else None
-                        })
-                except Exception as e:
-                    logger.error(f"Error searching for track {suggestion}: {str(e)}")
-                    continue
+        
+        for song in song_list:
+            search_url = "https://api.spotify.com/v1/search"
+            headers = {"Authorization": f"Bearer {access_token}"}
+            params = {"q": song, "type": "track", "limit": 1}
+            
+            res = requests.get(search_url, headers=headers, params=params)
+            if res.status_code == 200:
+                search_results = res.json()
+                items = search_results.get('tracks', {}).get('items', [])
+                if items:
+                    track = items[0]
+                    track_uris.append(track['uri'])
+                    tracks.append({
+                        'name': track['name'],
+                        'artist': track['artists'][0]['name'],
+                        'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
+                    })
 
-        if track_uris:
-            sp.playlist_add_items(playlist['id'], track_uris)
+        # Create playlist
+        create_playlist_url = f"https://api.spotify.com/v1/users/{user_id}/playlists"
+        payload = {
+            "name": f"AI Generated: {playlist_description[:30]}...",
+            "description": f"Generated by Moosic AI based on: {playlist_description}",
+            "public": False
+        }
+        
+        create_res = requests.post(
+            create_playlist_url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json=payload
+        )
+        
+        if create_res.status_code != 201:
+            return jsonify({"error": "Failed to create playlist"}), 400
+            
+        playlist_data = create_res.json()
+        playlist_id = playlist_data['id']
+
+        # Add tracks to playlist
+        add_tracks_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+        add_payload = {"uris": track_uris}
+        
+        add_res = requests.post(
+            add_tracks_url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json=add_payload
+        )
+        
+        if add_res.status_code != 201:
+            return jsonify({"error": "Failed to add tracks to playlist"}), 400
 
         return jsonify({
-            'playlist_url': playlist['external_urls']['spotify'],
-            'name': name.strip(),
-            'description': description.strip(),
-            'tracks': tracks
+            "success": True,
+            "playlist_url": playlist_data['external_urls']['spotify'],
+            "playlist_name": playlist_data['name'],
+            "tracks": tracks
         })
 
     except Exception as e:
-        logger.error(f"Error in generate-playlist: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 def retry_with_backoff(func, max_retries=3, initial_delay=1):
     """Retry a function with exponential backoff"""

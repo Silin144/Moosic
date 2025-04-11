@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Box,
   Button,
@@ -10,92 +11,67 @@ import {
   CardMedia,
   Alert,
   Snackbar,
-  Fade,
-  Zoom,
-  Grow
+  Grid,
+  Chip
 } from '@mui/material'
 import { useAuth } from '../contexts/AuthContext'
-import { motion } from 'framer-motion'
-import { styled } from '@mui/material/styles'
 
 interface Track {
   name: string
   artist: string
-  image: string
+  album_image: string
 }
 
 interface PlaylistPreview {
-  name: string
-  description: string
+  playlist_url: string
+  playlist_name: string
   tracks: Track[]
-  url: string
 }
 
-const PreviewCard = styled(Card)(({ theme }) => ({
-  background: 'rgba(255, 255, 255, 0.05)',
-  backdropFilter: 'blur(10px)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  borderRadius: 16,
-  transition: 'transform 0.3s ease-in-out',
-  '&:hover': {
-    transform: 'translateY(-8px)',
-    boxShadow: '0 12px 24px rgba(29, 185, 84, 0.2)',
-  },
-}))
-
-const TrackItem = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  padding: theme.spacing(2),
-  borderRadius: 8,
-  transition: 'background-color 0.2s ease-in-out',
-  '&:hover': {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-}))
-
 const GeneratePlaylist: React.FC = () => {
+  const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
-  const [prompt, setPrompt] = useState('')
+  const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [preview, setPreview] = useState<PlaylistPreview | null>(null)
-  const [openSnackbar, setOpenSnackbar] = useState(false)
+  const [playlistPreview, setPlaylistPreview] = useState<PlaylistPreview | null>(null)
+  const [showSuccess, setShowSuccess] = useState(false)
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      setError('Please enter a prompt')
+    if (!isAuthenticated) {
+      navigate('/auth')
       return
     }
 
-    setLoading(true)
-    setError(null)
-    setPreview(null)
+    if (!description.trim()) {
+      setError('Please describe your playlist')
+      return
+    }
 
     try {
+      setLoading(true)
+      setError(null)
+      setPlaylistPreview(null)
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate-playlist`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ description: description.trim() }),
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to generate playlist')
-      }
 
       const data = await response.json()
-      setPreview({
-        name: data.name,
-        description: data.description,
-        tracks: data.tracks || [],
-        url: data.playlist_url
-      })
-      setOpenSnackbar(true)
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate playlist')
+      }
+
+      setPlaylistPreview(data)
+      setShowSuccess(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : 'Failed to generate playlist')
     } finally {
       setLoading(false)
     }
@@ -105,212 +81,138 @@ const GeneratePlaylist: React.FC = () => {
     return (
       <Box
         display="flex"
-        justifyContent="center"
+        flexDirection="column"
         alignItems="center"
+        justifyContent="center"
         minHeight="100vh"
+        p={3}
       >
-        <Typography variant="h6">Please login to generate playlists</Typography>
+        <Typography variant="h5" gutterBottom>
+          Please log in to generate playlists
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={() => navigate('/auth')}
+          sx={{
+            background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
+            color: 'white',
+            '&:hover': {
+              background: 'linear-gradient(45deg, #1ED760 30%, #1DB954 90%)',
+            },
+          }}
+        >
+          Login with Spotify
+        </Button>
       </Box>
     )
   }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto' }}>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+    <Box p={3} maxWidth="1200px" mx="auto">
+      <Typography variant="h4" gutterBottom>
+        Generate Your Playlist
+      </Typography>
+      <Typography variant="body1" color="text.secondary" paragraph>
+        Describe the kind of playlist you want, and our AI will create it for you!
+      </Typography>
+
+      <TextField
+        fullWidth
+        multiline
+        rows={4}
+        variant="outlined"
+        label="Describe your playlist"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        sx={{ mb: 3 }}
+      />
+
+      <Button
+        variant="contained"
+        onClick={handleGenerate}
+        disabled={loading}
+        sx={{
+          background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
+          color: 'white',
+          padding: '12px 24px',
+          fontSize: '1.1rem',
+          '&:hover': {
+            background: 'linear-gradient(45deg, #1ED760 30%, #1DB954 90%)',
+          },
+        }}
       >
-        <Typography
-          variant="h4"
-          gutterBottom
-          sx={{
-            fontWeight: 'bold',
-            mb: 4,
-            background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            textAlign: 'center',
-            fontSize: { xs: '2rem', md: '2.5rem' }
-          }}
-        >
-          Generate Your Playlist
-        </Typography>
+        {loading ? <CircularProgress size={24} color="inherit" /> : 'Generate Playlist'}
+      </Button>
 
-        <Box 
-          sx={{ 
-            mb: 4,
-            p: { xs: 2, md: 4 },
-            borderRadius: 4,
-            background: 'rgba(255, 255, 255, 0.05)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}
-        >
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            variant="outlined"
-            label="Describe your perfect playlist"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="e.g., A playlist for a rainy day with indie folk music"
+      {error && (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {playlistPreview && (
+        <Box mt={4}>
+          <Typography variant="h5" gutterBottom>
+            Your Generated Playlist
+          </Typography>
+          <Typography variant="h6" gutterBottom>
+            {playlistPreview.playlist_name}
+          </Typography>
+          <Button
+            variant="contained"
+            href={playlistPreview.playlist_url}
+            target="_blank"
+            rel="noopener noreferrer"
             sx={{
-              '& .MuiOutlinedInput-root': {
-                '& fieldset': {
-                  borderColor: 'rgba(29, 185, 84, 0.5)',
-                },
-                '&:hover fieldset': {
-                  borderColor: 'rgba(29, 185, 84, 0.8)',
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: '#1DB954',
-                },
+              background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
+              color: 'white',
+              mb: 3,
+              '&:hover': {
+                background: 'linear-gradient(45deg, #1ED760 30%, #1DB954 90%)',
               },
-              mb: 2
             }}
-          />
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
           >
-            <Button
-              variant="contained"
-              onClick={handleGenerate}
-              disabled={loading}
-              sx={{
-                width: '100%',
-                py: 2,
-                background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #1ED760 30%, #1DB954 90%)',
-                },
-                borderRadius: 2,
-                fontSize: '1.1rem',
-                fontWeight: 'bold',
-                textTransform: 'none'
-              }}
-            >
-              {loading ? <CircularProgress size={24} color="inherit" /> : 'Generate Playlist'}
-            </Button>
-          </motion.div>
+            Open in Spotify
+          </Button>
+
+          <Box sx={{ 
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              sm: 'repeat(2, 1fr)',
+              md: 'repeat(3, 1fr)'
+            },
+            gap: 3,
+            mt: 4
+          }}>
+            {playlistPreview.tracks.map((track, index) => (
+              <Card key={index} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <CardMedia
+                  component="img"
+                  height="140"
+                  image={track.album_image}
+                  alt={track.name}
+                />
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Typography gutterBottom variant="h6" component="div">
+                    {track.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {track.artist}
+                  </Typography>
+                </CardContent>
+              </Card>
+            ))}
+          </Box>
         </Box>
+      )}
 
-        {error && (
-          <Fade in={true}>
-            <Alert 
-              severity="error" 
-              sx={{ 
-                mb: 2,
-                borderRadius: 2,
-                background: 'rgba(211, 47, 47, 0.1)',
-                border: '1px solid rgba(211, 47, 47, 0.2)'
-              }}
-            >
-              {error}
-            </Alert>
-          </Fade>
-        )}
-
-        {preview && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <PreviewCard>
-              <CardContent>
-                <Typography variant="h5" gutterBottom>
-                  Playlist Preview
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  {preview.description}
-                </Typography>
-                <Box sx={{ mt: 2 }}>
-                  {preview.tracks.map((track, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.1 }}
-                    >
-                      <TrackItem>
-                        {track.image && (
-                          <Box sx={{ mr: 2 }}>
-                            <img
-                              src={track.image}
-                              alt={track.name}
-                              style={{
-                                width: 48,
-                                height: 48,
-                                borderRadius: 4,
-                                objectFit: 'cover',
-                              }}
-                            />
-                          </Box>
-                        )}
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="subtitle1">
-                            {track.name}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {track.artist}
-                          </Typography>
-                        </Box>
-                      </TrackItem>
-                    </motion.div>
-                  ))}
-                </Box>
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-                  <Button
-                    variant="contained"
-                    href={preview.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    sx={{
-                      background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
-                      '&:hover': {
-                        background: 'linear-gradient(45deg, #1ED760 30%, #1DB954 90%)',
-                      },
-                      py: 1.5,
-                      px: 4,
-                      fontSize: '1rem',
-                      fontWeight: 'bold',
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      boxShadow: '0 4px 14px 0 rgba(29, 185, 84, 0.39)'
-                    }}
-                  >
-                    Open in Spotify
-                  </Button>
-                </Box>
-              </CardContent>
-            </PreviewCard>
-          </motion.div>
-        )}
-
-        <Snackbar
-          open={openSnackbar}
-          autoHideDuration={6000}
-          onClose={() => setOpenSnackbar(false)}
-          TransitionComponent={Zoom}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert 
-            onClose={() => setOpenSnackbar(false)} 
-            severity="success"
-            sx={{ 
-              width: '100%',
-              borderRadius: 2,
-              background: 'rgba(46, 125, 50, 0.1)',
-              border: '1px solid rgba(46, 125, 50, 0.2)'
-            }}
-          >
-            Playlist generated successfully!
-          </Alert>
-        </Snackbar>
-      </motion.div>
+      <Snackbar
+        open={showSuccess}
+        autoHideDuration={6000}
+        onClose={() => setShowSuccess(false)}
+        message="Playlist generated successfully!"
+      />
     </Box>
   )
 }
