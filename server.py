@@ -162,10 +162,10 @@ def callback():
     if request.method == 'POST':
         data = request.get_json()
         code = data.get('code')
-        redirect_uri = data.get('redirect_uri')
+        state = data.get('state')
     else:
         code = request.args.get('code')
-        redirect_uri = request.args.get('redirect_uri')
+        state = request.args.get('state')
     
     error = request.args.get('error')
     
@@ -176,6 +176,10 @@ def callback():
     if not code:
         logger.error("No authorization code received")
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20authorization%20code%20received")
+
+    if not state:
+        logger.error("No state parameter received")
+        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20state%20parameter%20received")
 
     try:
         # Exchange code for tokens using spotipy
