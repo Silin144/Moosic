@@ -580,10 +580,41 @@ def generate_playlist():
         except Exception as e:
             logger.error(f"Failed to create Spotify client: {str(e)}")
             return jsonify({"error": "Authentication error", "details": str(e)}), 401
+            
+        # Get user's top artists to improve recommendations
+        try:
+            top_artists = sp.current_user_top_artists(limit=5, time_range='medium_term')
+            top_artist_names = []
+            top_artist_genres = []
+            
+            for artist in top_artists['items']:
+                top_artist_names.append(artist['name'])
+                top_artist_genres.extend(artist['genres'])
+            
+            # Get unique genres
+            top_artist_genres = list(set(top_artist_genres))
+            
+            logger.info(f"User's top artists: {', '.join(top_artist_names[:3])}...")
+            logger.info(f"User's preferred genres: {', '.join(top_artist_genres[:5])}...")
+        except Exception as e:
+            logger.warning(f"Could not fetch user's top artists: {str(e)}")
+            top_artist_names = []
+            top_artist_genres = []
         
         # Generate song suggestions using OpenAI
         try:
             openai.api_key = os.getenv('OPENAI_API_KEY')
+            
+            # Build a more personalized prompt using the user's top artists and genres
+            personalization = ""
+            if top_artist_names or top_artist_genres:
+                personalization = "\n\nAdditional personalization information:"
+                if top_artist_names:
+                    personalization += f"\n- User's favorite artists include: {', '.join(top_artist_names[:5])}"
+                if top_artist_genres:
+                    personalization += f"\n- User's preferred genres include: {', '.join(top_artist_genres[:5])}"
+                personalization += "\n\nSuggest songs that align with these preferences while fitting the description."
+            
             completion = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
@@ -598,18 +629,20 @@ IMPORTANT RULES:
 2. For year-specific requests (e.g., '2016 vibes'), use ONLY songs that were genuine chart hits or culturally significant during that EXACT year.
 3. For decade requests (e.g., '90s rock'), select DEFINING songs that best represent the authentic sound from that period.
 4. Prioritize tracks from major artists with significant streaming numbers on platforms like Spotify.
-5. Ensure variety in your selections - don't suggest multiple songs from the same artist.
+5. Ensure variety in your selections - NEVER include multiple songs from the same artist.
 6. NEVER include novelty songs, parodies, joke songs, or low-quality tracks.
 7. Verify all suggested songs are legitimate tracks by established artists.
 8. For genre-specific requests, choose songs that are quintessential examples of that genre.
 9. For mood-based playlists, select songs that authentically evoke that specific emotional state.
 10. Format each song as 'Song Name by Artist Name' without any commentary.
+11. If user preferences are provided, balance between suggesting songs similar to their preferences and introducing them to new music that fits the requested description.
+12. Do NOT suggest the same song multiple times in any form.
 
-ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions."""
+ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions and NO duplicate songs."""
                     },
                     {
                         "role": "user",
-                        "content": f"Generate a list of 10 songs for this playlist idea:\n{playlist_description}"
+                        "content": f"Generate a list of 10 songs for this playlist idea:\n{playlist_description}{personalization}"
                     }
                 ],
                 temperature=0.7,
@@ -622,6 +655,7 @@ ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions."""
             # Search for tracks on Spotify - add more specific search exclusions
             track_uris = []
             tracks = []
+            added_artists = set()  # Track artists we've already added to avoid duplicates
             
             for song in song_list:
                 # Try to extract artist and track
@@ -629,6 +663,11 @@ ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions."""
                 if len(parts) == 2:
                     track_name = parts[0].strip()
                     artist_name = parts[1].strip()
+                    
+                    # Check if we already have a song by this artist
+                    if artist_name.lower() in added_artists:
+                        logger.info(f"Skipping duplicate artist: {artist_name}")
+                        continue
                     
                     # Search with artist and track parameters - exclude karaoke versions explicitly
                     search_url = "https://api.spotify.com/v1/search"
@@ -655,6 +694,14 @@ ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions."""
                             # Sort by popularity to get the most well-known version
                             filtered_items.sort(key=lambda x: x.get('popularity', 0), reverse=True)
                             track = filtered_items[0]
+                            
+                            # Add this artist to our tracking set
+                            track_artist = track['artists'][0]['name'].lower()
+                            if track_artist in added_artists:
+                                logger.info(f"Skipping duplicate artist (after search): {track_artist}")
+                                continue
+                                
+                            added_artists.add(track_artist)
                             track_uris.append(track['uri'])
                             tracks.append({
                                 'name': track['name'],
@@ -687,12 +734,59 @@ ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions."""
                         # Sort by popularity
                         filtered_items.sort(key=lambda x: x.get('popularity', 0), reverse=True)
                         track = filtered_items[0]
+                        
+                        # Check for duplicate artists
+                        track_artist = track['artists'][0]['name'].lower()
+                        if track_artist in added_artists:
+                            logger.info(f"Skipping duplicate artist (fallback search): {track_artist}")
+                            continue
+                            
+                        added_artists.add(track_artist)
                         track_uris.append(track['uri'])
                         tracks.append({
                             'name': track['name'],
                             'artist': track['artists'][0]['name'],
                             'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
                         })
+                        
+            # If we have less than 5 tracks, try to add related tracks based on user's top artists
+            if len(tracks) < 5 and top_artist_names:
+                logger.info("Adding related tracks from user's top artists to fill playlist")
+                try:
+                    # Get top tracks from top artists
+                    for artist_name in top_artist_names[:2]:
+                        # Search for the artist
+                        artist_results = sp.search(q=f"artist:{artist_name}", type="artist", limit=1)
+                        artist_items = artist_results.get('artists', {}).get('items', [])
+                        
+                        if artist_items:
+                            artist_id = artist_items[0]['id']
+                            top_tracks = sp.artist_top_tracks(artist_id)
+                            
+                            # Add up to 2 tracks per top artist
+                            for i, track in enumerate(top_tracks['tracks'][:2]):
+                                # Skip if we already have a track by this artist
+                                track_artist = track['artists'][0]['name'].lower()
+                                if track_artist in added_artists:
+                                    continue
+                                    
+                                added_artists.add(track_artist)
+                                track_uris.append(track['uri'])
+                                tracks.append({
+                                    'name': track['name'],
+                                    'artist': track['artists'][0]['name'],
+                                    'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
+                                })
+                                
+                                # Stop if we have 10 tracks
+                                if len(tracks) >= 10:
+                                    break
+                            
+                            # Stop if we have 10 tracks
+                            if len(tracks) >= 10:
+                                break
+                except Exception as e:
+                    logger.warning(f"Error adding related tracks: {str(e)}")
 
             # Create playlist
             create_playlist_url = f"https://api.spotify.com/v1/users/{session['user']['id']}/playlists"
