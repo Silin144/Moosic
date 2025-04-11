@@ -17,6 +17,12 @@ const base64encode = (input: ArrayBuffer) => {
     .replace(/\//g, '_')
 }
 
+const sha256 = async (plain: string) => {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(plain)
+  return window.crypto.subtle.digest('SHA-256', data)
+}
+
 const Auth: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -69,94 +75,76 @@ const Auth: React.FC = () => {
   }, [location, navigate, setIsAuthenticated])
 
   const handleLogin = async () => {
-    try {
-      // Generate a random state parameter
-      const state = generateRandomString(16)
-      // Store state in sessionStorage (more secure than localStorage)
-      sessionStorage.setItem('spotify_auth_state', state)
-
-      // Clear any existing session data
-      document.cookie.split(";").forEach(function(c) { 
-        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-      })
-
-      // Redirect to Spotify authorization endpoint
-      const authUrl = new URL('https://accounts.spotify.com/authorize')
-      const params = {
-        client_id: import.meta.env.VITE_SPOTIFY_CLIENT_ID,
+    // Clear any existing session data
+    localStorage.removeItem('code_verifier');
+    sessionStorage.removeItem('state');
+    
+    // Generate state parameter
+    const state = generateRandomString(16);
+    sessionStorage.setItem('state', state);
+    
+    // Generate PKCE code verifier and challenge
+    const codeVerifier = generateRandomString(128);
+    const codeChallenge = base64encode(await sha256(codeVerifier));
+    localStorage.setItem('code_verifier', codeVerifier);
+    
+    // Build authorization URL
+    const params = new URLSearchParams({
+        client_id: process.env.REACT_APP_SPOTIFY_CLIENT_ID || '',
         response_type: 'code',
-        redirect_uri: import.meta.env.VITE_SPOTIFY_REDIRECT_URI,
-        scope: 'playlist-modify-public playlist-modify-private user-read-private user-read-email',
+        redirect_uri: process.env.REACT_APP_REDIRECT_URI || '',
         state: state,
-        show_dialog: 'true'
-      }
-      
-      authUrl.search = new URLSearchParams(params).toString()
-      window.location.href = authUrl.toString()
-    } catch (err) {
-      console.error('Login error:', err)
-      setAuthStatus('error')
-      setError('Failed to initialize login')
-    }
-  }
+        code_challenge_method: 'S256',
+        code_challenge: codeChallenge,
+        scope: 'playlist-modify-public playlist-modify-private user-read-private user-read-email'
+    });
+    
+    window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
+  };
 
-  useEffect(() => {
-    const handleCallback = async () => {
-      const params = new URLSearchParams(window.location.search)
-      const code = params.get('code')
-      const state = params.get('state')
-      const error = params.get('error')
-      
-      if (error) {
-        setAuthStatus('error')
-        setError(error)
-        return
-      }
-      
-      // Verify state parameter
-      const storedState = sessionStorage.getItem('spotify_auth_state')
-      if (!state || !storedState || state !== storedState) {
-        console.error('State mismatch:', { received: state, stored: storedState })
-        setAuthStatus('error')
-        setError('State mismatch')
-        return
-      }
-      
-      // Clear the state from sessionStorage
-      sessionStorage.removeItem('spotify_auth_state')
-      
-      if (code) {
-        try {
-          // Make a POST request to our backend to exchange the code for tokens
-          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/callback`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              code,
-              redirect_uri: import.meta.env.VITE_SPOTIFY_REDIRECT_URI,
-              state: state // Send the state to the backend for verification
-            }),
-            credentials: 'include'
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to exchange code for token')
-          }
-
-          // Redirect to success page
-          window.location.href = `${window.location.origin}/auth?auth=success`
-        } catch (err) {
-          console.error('Callback error:', err)
-          setAuthStatus('error')
-          setError('Failed to handle callback')
-        }
-      }
+  const handleCallback = async () => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    const storedState = sessionStorage.getItem('state');
+    
+    if (!code) {
+        console.error('No authorization code received');
+        return;
     }
     
-    handleCallback()
-  }, [])
+    if (!state || state !== storedState) {
+        console.error('State parameter mismatch');
+        return;
+    }
+    
+    // Clear state from session storage
+    sessionStorage.removeItem('state');
+    
+    try {
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/callback`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                code,
+                state
+            }),
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to exchange code for tokens');
+        }
+        
+        // Redirect to success page
+        window.location.href = '/auth?auth=success';
+    } catch (error) {
+        console.error('Error during callback:', error);
+        window.location.href = '/auth?auth=error';
+    }
+  };
 
   if (authStatus === 'checking') {
     return (
