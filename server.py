@@ -972,7 +972,7 @@ Only list song recommendations - do not include introductions, explanations, or 
             # Log summary of tracks found
             if tracks:
                 logger.info(f"Successfully found {len(tracks)} tracks from song suggestions")
-                logger.info(f"First few tracks: {', '.join([f'{t['name']} by {t['artist']}' for t in tracks[:3]])}")
+                logger.info("First few tracks: " + ", ".join([f"{t['name']} by {t['artist']}" for t in tracks[:3]]))
             else:
                 logger.warning("No tracks found from song suggestions")
 
