@@ -132,12 +132,24 @@ def get_spotify_client():
 @app.route('/api/login')
 def login():
     try:
+        # Get PKCE parameters from request
+        code_challenge = request.args.get('code_challenge')
+        code_challenge_method = request.args.get('code_challenge_method')
+        
+        if not code_challenge or code_challenge_method != 'S256':
+            logger.error("Missing or invalid PKCE parameters")
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Invalid%20PKCE%20parameters")
+        
         # Generate state parameter
         state = 'moosic_state'
         session['oauth_state'] = state
         
-        # Get authorization URL
-        auth_url = sp_oauth.get_authorize_url(state=state)
+        # Get authorization URL with PKCE parameters
+        auth_url = sp_oauth.get_authorize_url(
+            state=state,
+            code_challenge=code_challenge,
+            code_challenge_method=code_challenge_method
+        )
         return redirect(auth_url)
     except Exception as e:
         logger.error(f"Error in login route: {str(e)}")
@@ -163,8 +175,12 @@ def callback():
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20authorization%20code%20received")
 
     try:
-        # Exchange code for tokens using spotipy
-        token_info = sp_oauth.get_access_token(code)
+        # Exchange code for tokens using spotipy with PKCE
+        token_info = sp_oauth.get_access_token(
+            code,
+            as_dict=False,
+            check_cache=False
+        )
         
         if not token_info:
             logger.error("Failed to get access token")
@@ -197,9 +213,6 @@ def callback():
         
         # Log successful authentication
         logger.info(f"User {user_info.get('id')} authenticated successfully")
-        
-        # Add a small delay to ensure session is saved
-        time.sleep(0.5)
         
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=success")
 

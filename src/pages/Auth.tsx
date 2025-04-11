@@ -4,6 +4,19 @@ import { Box, Button, Typography, CircularProgress, Alert } from '@mui/material'
 import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 
+const generateRandomString = (length: number) => {
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  const values = crypto.getRandomValues(new Uint8Array(length))
+  return values.reduce((acc, x) => acc + possible[x % possible.length], "")
+}
+
+const base64encode = (input: ArrayBuffer) => {
+  return btoa(String.fromCharCode(...new Uint8Array(input)))
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
+
 const Auth: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -55,16 +68,34 @@ const Auth: React.FC = () => {
     }
   }, [location, navigate, setIsAuthenticated])
 
-  const handleLogin = () => {
-    // Clear any existing session data
-    document.cookie.split(";").forEach(function(c) { 
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-    })
-    
-    // Add a small delay to ensure cookies are cleared
-    setTimeout(() => {
-      window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
-    }, 100)
+  const handleLogin = async () => {
+    try {
+      // Generate PKCE code verifier and challenge
+      const codeVerifier = generateRandomString(64)
+      const encoder = new TextEncoder()
+      const data = encoder.encode(codeVerifier)
+      const digest = await crypto.subtle.digest('SHA-256', data)
+      const codeChallenge = base64encode(digest)
+
+      // Store code verifier in localStorage
+      localStorage.setItem('code_verifier', codeVerifier)
+
+      // Clear any existing session data
+      document.cookie.split(";").forEach(function(c) { 
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+      })
+
+      // Redirect to login endpoint with PKCE parameters
+      const loginUrl = new URL(`${import.meta.env.VITE_API_URL}/api/login`)
+      loginUrl.searchParams.append('code_challenge', codeChallenge)
+      loginUrl.searchParams.append('code_challenge_method', 'S256')
+      
+      window.location.href = loginUrl.toString()
+    } catch (err) {
+      console.error('Login error:', err)
+      setAuthStatus('error')
+      setError('Failed to initialize login')
+    }
   }
 
   if (authStatus === 'checking') {
