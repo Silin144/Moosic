@@ -16,8 +16,17 @@ const Auth: React.FC = () => {
       try {
         setAuthStatus('checking')
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/check-auth`, {
-          credentials: 'include'
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          }
         })
+        
+        if (!response.ok) {
+          throw new Error('Failed to check authentication status')
+        }
+        
         const data = await response.json()
         
         if (data.authenticated) {
@@ -36,9 +45,7 @@ const Auth: React.FC = () => {
     // Check URL parameters for auth response
     const params = new URLSearchParams(location.search)
     if (params.get('auth') === 'success') {
-      setIsAuthenticated(true)
-      setAuthStatus('authenticated')
-      navigate('/')
+      checkAuth() // Re-check auth status after successful redirect
     } else if (params.get('auth') === 'error') {
       setAuthStatus('error')
       setError(params.get('message') || 'Authentication failed')
@@ -48,6 +55,11 @@ const Auth: React.FC = () => {
   }, [location, navigate, setIsAuthenticated])
 
   const handleLogin = () => {
+    // Clear any existing session data
+    document.cookie.split(";").forEach(function(c) { 
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+    });
+    
     window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
   }
 

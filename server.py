@@ -48,7 +48,7 @@ ssl_context = (
 )
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'some_random_key')
 
 # Configure session
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -56,9 +56,7 @@ app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
-app.config['SESSION_COOKIE_NAME'] = 'moosic_session'  # Unique session cookie name
-app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Refresh session on each request
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
 
 # Initialize Flask-Session
 Session(app)
@@ -66,7 +64,7 @@ Session(app)
 # Configure CORS
 CORS(app, resources={
     r"/api/*": {
-        "origins": [os.getenv('FRONTEND_URL')],
+        "origins": [os.environ['FRONTEND_URL']],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True,
@@ -79,7 +77,7 @@ CORS(app, resources={
 # Add error handler for CORS
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', os.getenv('FRONTEND_URL'))
+    response.headers.add('Access-Control-Allow-Origin', os.environ['FRONTEND_URL'])
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
