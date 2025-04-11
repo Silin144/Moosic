@@ -49,7 +49,7 @@ const Auth: React.FC = () => {
           console.log('User is authenticated, redirecting to home')
           setIsAuthenticated(true)
           setAuthStatus('authenticated')
-          navigate('/')
+          window.location.href = '/'
         } else {
           console.log('User is not authenticated, reason:', data.reason)
           setAuthStatus('idle')
@@ -61,20 +61,25 @@ const Auth: React.FC = () => {
       }
     }
 
-    // Check URL parameters for auth response
+    // Only run auth check if we're not in the callback flow
     const params = new URLSearchParams(location.search)
+    const isCallbackFlow = !!params.get('code')
+    
     if (params.get('auth') === 'success') {
+      console.log('Auth success detected, checking auth...')
       checkAuth()
     } else if (params.get('auth') === 'error') {
       setAuthStatus('error')
       setError(params.get('message') || 'Authentication failed')
-    } else if (params.get('code')) {
+    } else if (isCallbackFlow) {
       // If we have a code but no auth status, we're in the callback flow
       console.log('Code parameter found in URL, handling callback...')
-    } else {
+      // Don't run checkAuth now, let the callback handler do its work
+    } else if (authStatus !== 'checking') {
+      // Only check auth if we're not already checking
       checkAuth()
     }
-  }, [location, navigate, setIsAuthenticated])
+  }, [location, setIsAuthenticated])
 
   const handleLogin = async () => {
     try {
@@ -202,8 +207,8 @@ const Auth: React.FC = () => {
           const checkData = await checkResponse.json();
           console.log('Final auth check before redirect:', checkData);
           
-          // Navigate to home page
-          navigate('/?auth=success');
+          // Navigate to home page with full page refresh
+          window.location.href = '/';
         } catch (error) {
           console.error('Error during callback:', error);
           setAuthStatus('error');

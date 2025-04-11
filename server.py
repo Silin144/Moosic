@@ -450,7 +450,7 @@ def create_playlist():
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a music expert. Suggest 10 specific songs (with artists) that would fit the given mood and genres. Format the response as JSON with fields: songSuggestions (array of {title, artist}), description (string explaining the selection)."
+                    "content": "You are a professional music curator with extensive knowledge of various genres, artists, and songs. Your task is to suggest 10 specific songs (with artists) that would perfectly fit the given mood and genres. Follow these guidelines:\n\n1. Suggest only original songs, NO karaoke, cover, or tribute versions.\n2. Include a diverse mix of well-known and moderately popular songs, avoiding extremely obscure tracks.\n3. Focus on high-quality songs that match the requested mood and genres.\n4. Consider the cohesiveness of the playlist as a whole.\n5. Format the response as JSON with fields: songSuggestions (array of {title, artist}), description (string explaining why these songs fit together and how they match the requested mood/genres)."
                 },
                 {
                     "role": "user",
@@ -476,13 +476,22 @@ def create_playlist():
         added_tracks = []
         for song in suggestions['songSuggestions']:
             try:
-                query = f"{song['artist']} {song['title']}"
+                # Include original artist in search to avoid covers and karaoke versions
+                query = f"artist:{song['artist']} track:{song['title']}"
                 results = retry_with_backoff(lambda: sp.search(q=query, type='track', limit=1))
                 
                 if results['tracks']['items']:
                     track = results['tracks']['items'][0]
                     added_tracks.append(track)
                     logger.info(f"Found track: {track['name']} by {track['artists'][0]['name']}")
+                else:
+                    # Try a more general search if the specific search failed
+                    query = f"{song['artist']} {song['title']}"
+                    results = retry_with_backoff(lambda: sp.search(q=query, type='track', limit=1))
+                    if results['tracks']['items']:
+                        track = results['tracks']['items'][0]
+                        added_tracks.append(track)
+                        logger.info(f"Found track (general search): {track['name']} by {track['artists'][0]['name']}")
             except Exception as e:
                 logger.warning(f"Error searching for track: {song['title']}, error: {e}")
 
@@ -556,23 +565,59 @@ def generate_playlist():
         except Exception as e:
             logger.error(f"Failed to create Spotify client: {str(e)}")
             return jsonify({"error": "Authentication error", "details": str(e)}), 401
-
+        
         # Generate song suggestions using OpenAI
         try:
-            prompt = f"Generate a list of 10 songs for this playlist idea:\n{playlist_description}\n\nFormat each song as 'Song Name by Artist'"
-            openai_response = openai.Completion.create(
-                model="gpt-3.5-turbo-instruct",
-                prompt=prompt,
-                max_tokens=150
+            openai.api_key = os.getenv('OPENAI_API_KEY')
+            completion = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a professional music curator with extensive knowledge of various genres, artists, and songs. Your task is to generate a list of 10 songs that fit the provided playlist description. Follow these guidelines:\n\n1. Suggest only original songs, NO karaoke, cover, or tribute versions.\n2. Include a diverse mix of well-known and moderately popular songs, avoiding extremely obscure tracks.\n3. Focus on high-quality songs that match the requested mood or theme.\n4. Consider the cohesiveness of the playlist as a whole.\n5. Format each song as 'Song Name by Artist Name'"
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Generate a list of 10 songs for this playlist idea:\n{playlist_description}"
+                    }
+                ],
+                max_tokens=500
             )
             
-            song_list = [line.strip() for line in openai_response.choices[0].text.strip().split('\n') if line.strip()]
+            song_list = [line.strip() for line in completion.choices[0].message['content'].strip().split('\n') if line.strip()]
+            logger.info(f"Generated song list: {song_list}")
             
             # Search for tracks on Spotify
             track_uris = []
             tracks = []
             
             for song in song_list:
+                # Try to extract artist and track
+                parts = song.split(" by ")
+                if len(parts) == 2:
+                    track_name = parts[0].strip()
+                    artist_name = parts[1].strip()
+                    
+                    # Search with artist and track parameters
+                    search_url = "https://api.spotify.com/v1/search"
+                    headers = {"Authorization": f"Bearer {session['token_info']['access_token']}"}
+                    params = {"q": f"artist:{artist_name} track:{track_name}", "type": "track", "limit": 1}
+                    
+                    res = requests.get(search_url, headers=headers, params=params)
+                    if res.status_code == 200:
+                        search_results = res.json()
+                        items = search_results.get('tracks', {}).get('items', [])
+                        if items:
+                            track = items[0]
+                            track_uris.append(track['uri'])
+                            tracks.append({
+                                'name': track['name'],
+                                'artist': track['artists'][0]['name'],
+                                'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
+                            })
+                            continue
+                
+                # Fallback to general search if specific search failed or parsing failed
                 search_url = "https://api.spotify.com/v1/search"
                 headers = {"Authorization": f"Bearer {session['token_info']['access_token']}"}
                 params = {"q": song, "type": "track", "limit": 1}
@@ -592,8 +637,9 @@ def generate_playlist():
 
             # Create playlist
             create_playlist_url = f"https://api.spotify.com/v1/users/{session['user']['id']}/playlists"
+            playlist_title = f"AI Generated: {playlist_description[:30]}..." if len(playlist_description) > 30 else f"AI Generated: {playlist_description}"
             payload = {
-                "name": f"AI Generated: {playlist_description[:30]}...",
+                "name": playlist_title,
                 "description": f"Generated by Moosic AI based on: {playlist_description}",
                 "public": False
             }
