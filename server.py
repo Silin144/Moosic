@@ -63,6 +63,7 @@ app.config['PERMANENT_SESSION_LIFETIME'] = 3600
 app.config['SESSION_COOKIE_PATH'] = '/'
 app.config['SESSION_COOKIE_NAME'] = 'moosic_session'
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'  # Add this line for filesystem session storage
 
 # Initialize Flask-Session
 Session(app)
@@ -197,6 +198,9 @@ def callback():
         # Log successful authentication
         logger.info(f"User {user_info.get('id')} authenticated successfully")
         
+        # Add a small delay to ensure session is saved
+        time.sleep(0.5)
+        
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=success")
 
     except Exception as e:
@@ -206,6 +210,7 @@ def callback():
 @app.route('/api/check-auth')
 def check_auth():
     try:
+        logger.info(f"Checking auth, session keys: {list(session.keys())}")
         if 'token_info' in session and 'user' in session:
             # Check if token is expired
             if time.time() > session['token_info']['expires_at']:
@@ -247,7 +252,7 @@ def check_auth():
                 "user": session['user']
             })
         
-        logger.warning("No valid session found")
+        logger.warning(f"No valid session found. Session keys: {list(session.keys())}")
         return jsonify({"authenticated": False})
     except Exception as e:
         logger.error(f"Error in check-auth: {str(e)}")
