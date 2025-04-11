@@ -450,13 +450,28 @@ def create_playlist():
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a professional music curator with extensive knowledge of various genres, artists, and songs. Your task is to suggest 10 specific songs (with artists) that would perfectly fit the given mood and genres. Follow these guidelines:\n\n1. Suggest only original songs, NO karaoke, cover, or tribute versions.\n2. Include a diverse mix of well-known and moderately popular songs, avoiding extremely obscure tracks.\n3. Focus on high-quality songs that match the requested mood and genres.\n4. Consider the cohesiveness of the playlist as a whole.\n5. Format the response as JSON with fields: songSuggestions (array of {title, artist}), description (string explaining why these songs fit together and how they match the requested mood/genres)."
+                    "content": """You are a professional music curator with extensive knowledge of music history, chart hits, and cultural trends across different time periods.
+
+Your task is to suggest 10 specific songs (with artists) that perfectly match the requested mood and genres.
+
+Follow these guidelines:
+1. For year or era-specific requests (e.g., '2016 vibes', '90s rock'), prioritize actual popular/charting songs from that time period.
+2. Suggest only original songs, NO parodies, karaoke, covers, tributes, or remixes unless specifically requested.
+3. Include well-known, high-quality songs that match the requested mood and genres.
+4. Prioritize songs that were commercially successful or critically acclaimed.
+5. Never include novelty songs, joke songs, or parodies unless explicitly requested.
+6. When given a year or decade, focus on songs that were actually popular or influential during that time.
+7. Ensure all suggestions are legitimate songs by real artists, not fabricated.
+8. Format the response as JSON with fields:
+   - songSuggestions (array of {title, artist})
+   - description (string explaining why these songs fit the request and how they connect to any specified time period)"""
                 },
                 {
                     "role": "user",
                     "content": f"Suggest songs for a {mood} playlist with these genres: {', '.join(genres)}"
                 }
-            ]
+            ],
+            temperature=0.7
         )
         
         suggestions = json.loads(completion.choices[0].message['content'])
@@ -574,14 +589,28 @@ def generate_playlist():
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a professional music curator with extensive knowledge of various genres, artists, and songs. Your task is to generate a list of 10 songs that fit the provided playlist description. Follow these guidelines:\n\n1. Suggest only original songs, NO karaoke, cover, or tribute versions.\n2. Include a diverse mix of well-known and moderately popular songs, avoiding extremely obscure tracks.\n3. Focus on high-quality songs that match the requested mood or theme.\n4. Consider the cohesiveness of the playlist as a whole.\n5. Format each song as 'Song Name by Artist Name'"
+                        "content": """You are a professional music curator with extensive knowledge of music history, chart hits, and cultural trends across different time periods.
+
+Your task is to generate a list of 10 songs that perfectly match the provided playlist description.
+
+Follow these guidelines:
+1. For year or era-specific requests (e.g., '2016 vibes', '90s rock'), prioritize actual popular/charting songs from that exact time period.
+2. Suggest only original songs, NO parodies, karaoke, covers, tributes, or remixes unless specifically requested.
+3. Include well-known, high-quality songs that match the requested mood, theme, or era.
+4. Prioritize songs that were commercially successful or critically acclaimed during the specified period.
+5. Never include novelty songs, joke songs, or parodies unless explicitly requested.
+6. For year-specific requests, include only songs that were actually released or popular in that exact year.
+7. For decade requests (80s, 90s, etc.), include defining songs from that decade that best represent its sound.
+8. Ensure all suggestions are legitimate songs by real artists that can be found on Spotify.
+9. Format each song as 'Song Name by Artist Name'"""
                     },
                     {
                         "role": "user",
                         "content": f"Generate a list of 10 songs for this playlist idea:\n{playlist_description}"
                     }
                 ],
-                max_tokens=500
+                temperature=0.7,
+                max_tokens=600
             )
             
             song_list = [line.strip() for line in completion.choices[0].message['content'].strip().split('\n') if line.strip()]
