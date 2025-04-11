@@ -22,16 +22,37 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+// Use this to prevent multiple auth checks in a short period
+let lastAuthCheck = 0;
+let lastAuthResult = false;
+const AUTH_CHECK_THROTTLE = 5000; // 5 seconds
+
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   
-  // Check authentication status on mount
+  // Check authentication status on mount, but only once
   useEffect(() => {
+    const now = Date.now();
+    // If we've checked auth recently, use the cached result
+    if (now - lastAuthCheck < AUTH_CHECK_THROTTLE) {
+      console.log('Using cached auth status', lastAuthResult);
+      setIsAuthenticated(lastAuthResult);
+      return;
+    }
     checkAuthStatus();
   }, []);
   
   const checkAuthStatus = async (): Promise<boolean> => {
+    const now = Date.now();
+    
+    // If we've checked auth recently, use the cached result
+    if (now - lastAuthCheck < AUTH_CHECK_THROTTLE) {
+      console.log('Using cached auth status', lastAuthResult);
+      return lastAuthResult;
+    }
+    
     try {
+      console.log('Checking auth status from server...');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/check-auth`, {
         credentials: 'include',
         headers: {
@@ -43,6 +64,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (!response.ok) {
         console.error('Auth check failed with status:', response.status);
         setIsAuthenticated(false);
+        
+        // Update cache
+        lastAuthCheck = now;
+        lastAuthResult = false;
+        
         return false;
       }
       
@@ -51,10 +77,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       const isAuth = !!data.authenticated;
       setIsAuthenticated(isAuth);
+      
+      // Update cache
+      lastAuthCheck = now;
+      lastAuthResult = isAuth;
+      
       return isAuth;
     } catch (err) {
       console.error('Auth check error:', err);
       setIsAuthenticated(false);
+      
+      // Update cache
+      lastAuthCheck = now;
+      lastAuthResult = false;
+      
       return false;
     }
   };
@@ -86,6 +122,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (response.status === 401) {
       console.error('Received 401 Unauthorized response');
       setIsAuthenticated(false);
+      
+      // Update cache
+      lastAuthCheck = Date.now();
+      lastAuthResult = false;
+      
       throw new Error('Not authenticated');
     }
     
@@ -102,6 +143,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
     
     setIsAuthenticated(false);
+    
+    // Update cache
+    lastAuthCheck = Date.now();
+    lastAuthResult = false;
   };
 
   return (

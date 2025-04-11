@@ -5,6 +5,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { useAuth } from './contexts/AuthContext'
 import GeneratePlaylist from './pages/GeneratePlaylist'
 import Auth from './pages/Auth'
+import { useState, useEffect } from 'react'
 
 const theme = createTheme({
   palette: {
@@ -29,6 +30,21 @@ const queryClient = new QueryClient()
 
 const AppContent = () => {
   const { isAuthenticated } = useAuth()
+  const [initialized, setInitialized] = useState(false)
+
+  // Wait for auth state to stabilize before rendering routes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialized(true)
+    }, 500)
+    
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Don't render routes until we've initialized
+  if (!initialized) {
+    return null
+  }
 
   return (
     <Routes>

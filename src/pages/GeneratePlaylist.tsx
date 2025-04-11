@@ -36,17 +36,22 @@ const GeneratePlaylist: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [playlistPreview, setPlaylistPreview] = useState<PlaylistPreview | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
 
-  // Check auth status when component mounts
+  // Check auth status only once when component mounts
   React.useEffect(() => {
-    const verifyAuth = async () => {
-      const isAuth = await checkAuthStatus();
-      if (!isAuth) {
-        navigate('/auth');
-      }
-    };
-    verifyAuth();
-  }, [checkAuthStatus, navigate]);
+    // Only check auth if we haven't already and don't yet know if user is authenticated
+    if (!authChecked && !isAuthenticated) {
+      const verifyAuth = async () => {
+        const isAuth = await checkAuthStatus();
+        setAuthChecked(true);
+        if (!isAuth) {
+          navigate('/auth');
+        }
+      };
+      verifyAuth();
+    }
+  }, [authChecked, isAuthenticated, checkAuthStatus, navigate]);
 
   const handleGenerate = async () => {
     if (!isAuthenticated) {
