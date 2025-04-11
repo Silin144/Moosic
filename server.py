@@ -12,6 +12,7 @@ import openai
 from dotenv import load_dotenv
 import requests
 import secrets
+import urllib.parse
 
 # Load environment variables
 load_dotenv()
@@ -148,12 +149,22 @@ def login():
         session['oauth_state'] = state
         session.modified = True  # Force session to be saved
         
-        # Get authorization URL with PKCE parameters
-        auth_url = sp_oauth.get_authorize_url(
-            state=state,
-            code_challenge=code_challenge,
-            code_challenge_method=code_challenge_method
-        )
+        # Manually construct authorization URL with PKCE parameters
+        auth_url = "https://accounts.spotify.com/authorize"
+        params = {
+            'client_id': os.getenv('SPOTIFY_CLIENT_ID'),
+            'response_type': 'code',
+            'redirect_uri': os.getenv('SPOTIFY_REDIRECT_URI'),
+            'state': state,
+            'scope': 'playlist-modify-public playlist-modify-private user-read-private user-read-email',
+            'code_challenge_method': code_challenge_method,
+            'code_challenge': code_challenge,
+            'show_dialog': 'true'
+        }
+        
+        auth_url = f"{auth_url}?{urllib.parse.urlencode(params)}"
+        logger.info(f"Generated authorization URL: {auth_url[:100]}...")
+        
         return redirect(auth_url)
     except Exception as e:
         logger.error(f"Error in login route: {str(e)}")
@@ -218,12 +229,33 @@ def callback():
 
         # Exchange code for tokens using spotipy with PKCE
         try:
-            token_info = sp_oauth.get_access_token(
-                code,
-                as_dict=True,  # Changed to True for easier handling
-                check_cache=False,
-                code_verifier=code_verifier
+            # Manual token exchange using requests since SpotifyOAuth doesn't support PKCE
+            logger.info("Performing manual token exchange with PKCE")
+            token_url = 'https://accounts.spotify.com/api/token'
+            payload = {
+                'grant_type': 'authorization_code',
+                'code': code,
+                'redirect_uri': os.getenv('SPOTIFY_REDIRECT_URI'),
+                'client_id': os.getenv('SPOTIFY_CLIENT_ID'),
+                'code_verifier': code_verifier
+            }
+            
+            response = requests.post(
+                token_url,
+                data=payload,
+                headers={
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
             )
+            
+            if response.status_code != 200:
+                error_msg = f"Token exchange failed: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                if request.method == 'POST':
+                    return jsonify({"status": "error", "message": error_msg}), 400
+                return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20access%20token")
+            
+            token_info = response.json()
             logger.info("Successfully obtained token info")
         except Exception as e:
             logger.error(f"Error getting access token: {str(e)}")
