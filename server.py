@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 import requests
 import secrets
 import urllib.parse
+import re
 
 # Load environment variables
 load_dotenv()
@@ -668,53 +669,115 @@ def generate_playlist():
             # Build a more personalized prompt using the user's top artists and genres
             personalization = ""
             if top_artist_names or top_artist_genres:
-                personalization = "\n\nAdditional personalization information:"
+                personalization = "\n\n## USER PROFILE:"
                 if top_artist_names:
-                    personalization += f"\n- User's favorite artists include: {', '.join(top_artist_names[:5])}"
+                    personalization += f"\n- Favorite Artists: {', '.join(top_artist_names[:5])}"
                 if top_artist_genres:
-                    personalization += f"\n- User's preferred genres include: {', '.join(top_artist_genres[:5])}"
-                personalization += "\n\nSuggest songs that align with these preferences while fitting the description."
+                    personalization += f"\n- Preferred Genres: {', '.join(top_artist_genres[:5])}"
+            
+            # Extract key aspects from the playlist description
+            prompt_analysis = f"""
+## PLAYLIST REQUEST:
+"{playlist_description}"
+
+{personalization}
+
+## FIRST, ANALYZE THIS REQUEST:
+1. Identify specific era/decade mentions (e.g., "90s", "2010s summer")
+2. Extract genre keywords (e.g., "rock", "hip-hop", "indie folk")
+3. Identify mood/vibe descriptors (e.g., "chill", "upbeat", "melancholic")
+4. Note any activity contexts (e.g., "workout", "studying", "road trip")
+5. Identify any specific artist influences mentioned
+
+## THEN, GENERATE SONG SELECTIONS:
+Based on your analysis, provide 15-20 highly relevant songs that precisely match the request.
+"""
             
             completion = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="gpt-4-turbo-preview",  # Using GPT-4 Turbo for better music knowledge
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a professional music curator with deep industry knowledge and expertise in music history, chart hits, and cultural trends across different time periods.
+                        "content": """You are an elite music curator with encyclopedic knowledge of music across all eras, genres, and cultures. Your recommendations are always authentic, accurate, and perfectly tailored to the request.
 
-Your task is to generate a list of 15-20 songs that perfectly match the provided playlist description.
+## YOUR CAPABILITIES:
+- Deep understanding of music history, styles, scenes, and cultural significance
+- Extensive knowledge of chart hits and underground classics from all decades
+- Ability to match songs precisely to moods, activities, and specific requests
+- Recognition of subtle distinctions between subgenres and music movements
 
-IMPORTANT RULES:
-1. NEVER suggest karaoke, covers, remixes, tributes, or "made famous by" versions of songs - STRICTLY ORIGINAL RECORDINGS ONLY.
-2. For year-specific requests (e.g., '2016 vibes'), use ONLY songs that were genuine chart hits or culturally significant during that EXACT year.
-3. For decade requests (e.g., '90s rock'), select DEFINING songs that best represent the authentic sound from that period.
-4. Prioritize tracks from major artists with significant streaming numbers on platforms like Spotify.
-5. Ensure variety in your selections - NEVER include multiple songs from the same artist.
-6. NEVER include novelty songs, parodies, joke songs, or low-quality tracks.
-7. Verify all suggested songs are legitimate tracks by established artists.
-8. For genre-specific requests, choose songs that are quintessential examples of that genre.
-9. For mood-based playlists, select songs that authentically evoke that specific emotional state.
-10. Format each song as 'Song Name by Artist Name' without any commentary.
-11. If user preferences are provided, balance between suggesting songs similar to their preferences and introducing them to new music that fits the requested description.
-12. Do NOT suggest the same song multiple times in any form.
-13. Include a diverse range of artists, with a good mix of well-known hits and deeper cuts.
-14. Aim for songs with good streaming availability on platforms like Spotify.
+## STRICT RULES:
+1. NEVER suggest karaoke, covers, remixes, or tributes - ONLY original studio recordings
+2. For year-specific requests (e.g., "2016 hits"), ONLY include songs that were actually released or popular in that EXACT timeframe
+3. For decade requests (e.g., "90s rock"), choose defining songs that genuinely represent that era's sound
+4. Never include more than one song by the same artist
+5. ONLY include real, streamable songs (no made-up tracks)
+6. Ensure genre accuracy - don't include pop songs when rock is requested
+7. Format each song as: "Song Title by Artist Name"
+8. NEVER provide commentary or explanations with the songs
 
-ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions and NO duplicate songs."""
+## ANALYSIS APPROACH:
+1. First, thoroughly analyze the request to understand the exact era, genre, mood, and context
+2. Consider the user's known preferences but balance with discovery
+3. For ambiguous requests, lean toward mainstream hits for better recognition
+4. For specific genre requests, include authentic examples that define that sound
+5. For mood-based requests, focus on songs that genuinely evoke that emotional state
+
+## OUTPUT FORMAT:
+Only list song recommendations - do not include introductions, explanations, or commentary.
+"""
                     },
                     {
                         "role": "user",
-                        "content": f"Generate a list of 15-20 songs for this playlist idea:\n{playlist_description}{personalization}"
+                        "content": prompt_analysis
                     }
                 ],
                 temperature=0.7,
-                max_tokens=800
+                max_tokens=1500,
+                top_p=0.9,
+                presence_penalty=0.3,
+                frequency_penalty=0.5
             )
             
-            song_list = [line.strip() for line in completion.choices[0].message['content'].strip().split('\n') if line.strip()]
-            logger.info(f"Generated song list with {len(song_list)} tracks")
+            # Process the GPT response to extract songs
+            song_text = completion.choices[0].message['content'].strip()
             
-            # Search for tracks on Spotify - add more specific search exclusions
+            # Try to extract songs with different patterns
+            song_list = []
+            
+            # Look for numbered lists (1. Song by Artist)
+            numbered_pattern = re.compile(r'^\d+\.\s*(.+?)\s+by\s+(.+?)$', re.MULTILINE)
+            for match in numbered_pattern.finditer(song_text):
+                song_list.append(f"{match.group(1)} by {match.group(2)}")
+            
+            # Look for bullet points (• Song by Artist)
+            bullet_pattern = re.compile(r'^[•\-\*]\s*(.+?)\s+by\s+(.+?)$', re.MULTILINE)
+            for match in bullet_pattern.finditer(song_text):
+                song_list.append(f"{match.group(1)} by {match.group(2)}")
+            
+            # Look for plain "Song by Artist" format
+            plain_pattern = re.compile(r'^(.+?)\s+by\s+(.+?)$', re.MULTILINE)
+            # Only use this if we don't have enough songs yet
+            if len(song_list) < 10:
+                for match in plain_pattern.finditer(song_text):
+                    song_list.append(f"{match.group(1)} by {match.group(2)}")
+            
+            # Fallback: if we still don't have songs, split by newlines and look for "by"
+            if len(song_list) < 5:
+                for line in song_text.split('\n'):
+                    if " by " in line and not line.startswith('#') and not line.startswith('*'):
+                        song_list.append(line.strip())
+            
+            # Remove duplicates while preserving order
+            seen = set()
+            song_list = [x for x in song_list if not (x.lower() in seen or seen.add(x.lower()))]
+            
+            # Log the extracted song list
+            logger.info(f"Generated song list with {len(song_list)} tracks")
+            if len(song_list) < 5:
+                logger.warning(f"Low number of songs extracted. Raw GPT response: {song_text[:500]}")
+            
+            # Search for tracks on Spotify with more advanced filtering
             track_uris = []
             tracks = []
             added_artists = set()  # Track artists we've already added to avoid duplicates
@@ -731,114 +794,315 @@ ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions and
                         logger.info(f"Skipping duplicate artist: {artist_name}")
                         continue
                     
+                    # Clean up track and artist names for better search results
+                    # Remove text in parentheses or brackets which might confuse search
+                    clean_track_name = re.sub(r'\([^)]*\)|\[[^\]]*\]', '', track_name).strip()
+                    clean_artist_name = re.sub(r'\([^)]*\)|\[[^\]]*\]', '', artist_name).strip()
+                    
                     # Search with artist and track parameters - exclude karaoke versions explicitly
                     search_url = "https://api.spotify.com/v1/search"
                     headers = {"Authorization": f"Bearer {session['token_info']['access_token']}"}
                     
-                    # First try searching with negative filters to exclude karaoke/tribute versions
-                    exclude_terms = "NOT karaoke NOT tribute NOT 'made famous' NOT cover NOT remake NOT instrumental"
-                    filtered_query = f"artist:\"{artist_name}\" track:\"{track_name}\" {exclude_terms}"
-                    params = {"q": filtered_query, "type": "track", "limit": 3}
-                    
-                    res = requests.get(search_url, headers=headers, params=params)
-                    if res.status_code == 200:
-                        search_results = res.json()
-                        items = search_results.get('tracks', {}).get('items', [])
-                        
-                        # Filter out any tracks with suspicious names indicating karaoke versions
-                        filtered_items = [
-                            item for item in items 
-                            if not any(keyword in item['name'].lower() for keyword in 
-                                      ['karaoke', 'tribute', 'cover', 'made famous', 'instrumental', 'remake'])
-                        ]
-                        
-                        if filtered_items:
-                            # Sort by popularity to get the most well-known version
-                            filtered_items.sort(key=lambda x: x.get('popularity', 0), reverse=True)
-                            track = filtered_items[0]
-                            
-                            # Add this artist to our tracking set
-                            track_artist = track['artists'][0]['name'].lower()
-                            if track_artist in added_artists:
-                                logger.info(f"Skipping duplicate artist (after search): {track_artist}")
-                                continue
-                                
-                            added_artists.add(track_artist)
-                            track_uris.append(track['uri'])
-                            tracks.append({
-                                'name': track['name'],
-                                'artist': track['artists'][0]['name'],
-                                'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
-                            })
-                            continue
-                
-                # Fallback to general search if specific search failed or parsing failed
-                search_url = "https://api.spotify.com/v1/search"
-                headers = {"Authorization": f"Bearer {session['token_info']['access_token']}"}
-                
-                # Add exclusion terms to general search too
-                general_query = f"{song} NOT karaoke NOT tribute NOT cover"
-                params = {"q": general_query, "type": "track", "limit": 3}
-                
-                res = requests.get(search_url, headers=headers, params=params)
-                if res.status_code == 200:
-                    search_results = res.json()
-                    items = search_results.get('tracks', {}).get('items', [])
-                    
-                    # Filter out suspicious tracks
-                    filtered_items = [
-                        item for item in items 
-                        if not any(keyword in item['name'].lower() for keyword in 
-                                  ['karaoke', 'tribute', 'cover', 'made famous', 'instrumental', 'remake'])
+                    # Try three search strategies in order of specificity
+                    search_strategies = [
+                        # 1. Exact artist and track with negative filters
+                        {
+                            "query": f"artist:\"{clean_artist_name}\" track:\"{clean_track_name}\" NOT karaoke NOT tribute NOT cover NOT remake NOT instrumental NOT live NOT remix",
+                            "description": "exact search with filters"
+                        },
+                        # 2. Exact artist and track without negative filters
+                        {
+                            "query": f"artist:\"{clean_artist_name}\" track:\"{clean_track_name}\"",
+                            "description": "exact search"
+                        },
+                        # 3. General search with artist name and track
+                        {
+                            "query": f"\"{clean_track_name}\" \"{clean_artist_name}\" NOT karaoke NOT cover NOT tribute",
+                            "description": "general search"
+                        }
                     ]
                     
-                    if filtered_items:
-                        # Sort by popularity
-                        filtered_items.sort(key=lambda x: x.get('popularity', 0), reverse=True)
-                        track = filtered_items[0]
-                        
-                        # Check for duplicate artists
-                        track_artist = track['artists'][0]['name'].lower()
-                        if track_artist in added_artists:
-                            logger.info(f"Skipping duplicate artist (fallback search): {track_artist}")
-                            continue
+                    found_track = False
+                    for strategy in search_strategies:
+                        if found_track:
+                            break
                             
-                        added_artists.add(track_artist)
-                        track_uris.append(track['uri'])
-                        tracks.append({
-                            'name': track['name'],
-                            'artist': track['artists'][0]['name'],
-                            'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
-                        })
+                        try:
+                            params = {"q": strategy["query"], "type": "track", "limit": 5, "market": "US"}
+                            res = requests.get(search_url, headers=headers, params=params)
+                            
+                            if res.status_code == 200:
+                                search_results = res.json()
+                                items = search_results.get('tracks', {}).get('items', [])
+                                
+                                if not items:
+                                    logger.info(f"No results for '{clean_track_name}' by '{clean_artist_name}' using {strategy['description']}")
+                                    continue
+                                
+                                # Filter out suspicious tracks
+                                filtered_items = [
+                                    item for item in items 
+                                    if not any(keyword in item['name'].lower() for keyword in 
+                                              ['karaoke', 'tribute', 'cover', 'made famous', 'instrumental', 'remake', 'originally performed', 'as made famous'])
+                                ]
+                                
+                                if not filtered_items:
+                                    logger.info(f"No clean results for '{clean_track_name}' by '{clean_artist_name}' after filtering")
+                                    continue
+                                
+                                # Sort by match quality and popularity
+                                # First prioritize exact name matches, then by popularity
+                                exact_matches = [
+                                    item for item in filtered_items 
+                                    if item['name'].lower() == clean_track_name.lower() and 
+                                    any(artist['name'].lower() == clean_artist_name.lower() for artist in item['artists'])
+                                ]
+                                
+                                if exact_matches:
+                                    # Sort exact matches by popularity
+                                    exact_matches.sort(key=lambda x: x.get('popularity', 0), reverse=True)
+                                    track = exact_matches[0]
+                                else:
+                                    # Sort by popularity otherwise
+                                    filtered_items.sort(key=lambda x: x.get('popularity', 0), reverse=True)
+                                    track = filtered_items[0]
+                                
+                                # Check artist name to make sure we have a reasonable match
+                                track_artist = track['artists'][0]['name'].lower()
+                                if track_artist in added_artists:
+                                    logger.info(f"Skipping duplicate artist (after search): {track_artist}")
+                                    found_track = True  # Consider this "found" to avoid additional searches
+                                    continue
+                                
+                                # Check if this is truly a good match
+                                # Use Levenshtein distance for fuzzy matching
+                                artist_match = any(
+                                    self_similar(clean_artist_name.lower(), artist['name'].lower(), 0.8) 
+                                    for artist in track['artists']
+                                )
+                                
+                                if not artist_match:
+                                    logger.info(f"Artist mismatch: Expected '{clean_artist_name}', got '{track['artists'][0]['name']}'")
+                                    # If it's not the first strategy, skip this result
+                                    if strategy != search_strategies[0]:
+                                        continue
+                                
+                                added_artists.add(track_artist)
+                                track_uris.append(track['uri'])
+                                tracks.append({
+                                    'name': track['name'],
+                                    'artist': track['artists'][0]['name'],
+                                    'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
+                                })
+                                found_track = True
+                                logger.info(f"Found track: '{track['name']}' by '{track['artists'][0]['name']}' using {strategy['description']}")
+                                break
+                            
+                        except Exception as e:
+                            logger.warning(f"Error searching for '{clean_track_name}' by '{clean_artist_name}': {str(e)}")
+                            continue
+                else:
+                    # Handle malformatted songs without "by"
+                    logger.warning(f"Malformatted song suggestion: {song}")
+                    # Try a general search if the specific search failed
+                    try:
+                        search_url = "https://api.spotify.com/v1/search"
+                        headers = {"Authorization": f"Bearer {session['token_info']['access_token']}"}
                         
+                        general_query = f"{song} NOT karaoke NOT tribute NOT cover"
+                        params = {"q": general_query, "type": "track", "limit": 3, "market": "US"}
+                        
+                        res = requests.get(search_url, headers=headers, params=params)
+                        if res.status_code == 200:
+                            search_results = res.json()
+                            items = search_results.get('tracks', {}).get('items', [])
+                            
+                            # Filter out suspicious tracks
+                            filtered_items = [
+                                item for item in items 
+                                if not any(keyword in item['name'].lower() for keyword in 
+                                          ['karaoke', 'tribute', 'cover', 'made famous', 'instrumental', 'remake'])
+                            ]
+                            
+                            if filtered_items:
+                                # Sort by popularity
+                                filtered_items.sort(key=lambda x: x.get('popularity', 0), reverse=True)
+                                track = filtered_items[0]
+                                
+                                # Check for duplicate artists
+                                track_artist = track['artists'][0]['name'].lower()
+                                if track_artist in added_artists:
+                                    logger.info(f"Skipping duplicate artist (fallback search): {track_artist}")
+                                    continue
+                                    
+                                added_artists.add(track_artist)
+                                track_uris.append(track['uri'])
+                                tracks.append({
+                                    'name': track['name'],
+                                    'artist': track['artists'][0]['name'],
+                                    'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
+                                })
+                    except Exception as e:
+                        logger.warning(f"Failed general search for '{song}': {str(e)}")
+
+            # Function to check string similarity (for artist name matching)
+            def self_similar(str1, str2, threshold=0.8):
+                """Check if two strings are similar using character-level comparison."""
+                if not str1 or not str2:
+                    return False
+                    
+                # Quick check for exact match or substring
+                if str1 == str2 or str1 in str2 or str2 in str1:
+                    return True
+                
+                # Simple character-based similarity
+                str1_chars = set(str1)
+                str2_chars = set(str2)
+                intersection = str1_chars.intersection(str2_chars)
+                union = str1_chars.union(str2_chars)
+                
+                jaccard = len(intersection) / len(union) if union else 0
+                return jaccard >= threshold
+
             # Try to reach at least 15 tracks by adding related tracks if needed
             if len(tracks) < 15:
                 logger.info(f"Only found {len(tracks)} tracks, adding related tracks to reach 15-20 total")
                 try:
-                    # Use a mix of recommendations based on genres, top artists, and found tracks
-                    seed_tracks = track_uris[:2] if track_uris else []
+                    # Extract audio features for the tracks we've found to better understand the playlist's vibe
+                    audio_features = None
+                    avg_features = {
+                        'danceability': 0.5,
+                        'energy': 0.5,
+                        'tempo': 120,
+                        'valence': 0.5
+                    }
+                    
+                    if track_uris:
+                        try:
+                            # Get audio features for found tracks to understand the playlist's sound profile
+                            audio_features_url = "https://api.spotify.com/v1/audio-features"
+                            params = {"ids": ",".join([uri.split(":")[-1] for uri in track_uris[:10]])}
+                            audio_res = requests.get(
+                                audio_features_url, 
+                                headers={"Authorization": f"Bearer {session['token_info']['access_token']}"},
+                                params=params
+                            )
+                            
+                            if audio_res.status_code == 200:
+                                audio_features = audio_res.json().get('audio_features', [])
+                                if audio_features:
+                                    # Calculate averages for key parameters
+                                    feature_sums = {
+                                        'danceability': 0,
+                                        'energy': 0,
+                                        'tempo': 0,
+                                        'valence': 0  # happiness/positivity
+                                    }
+                                    count = 0
+                                    
+                                    for feature in audio_features:
+                                        if feature:  # Some tracks might not have features
+                                            count += 1
+                                            for key in feature_sums.keys():
+                                                if key in feature:
+                                                    feature_sums[key] += feature[key]
+                                    
+                                    if count > 0:
+                                        for key in feature_sums:
+                                            avg_features[key] = feature_sums[key] / count
+                                    
+                                    logger.info(f"Average audio features: {avg_features}")
+                        except Exception as e:
+                            logger.warning(f"Error getting audio features: {str(e)}")
+                    
+                    # Determine playlist mood from description or audio features
+                    playlist_mood = "unknown"
+                    is_happy = avg_features['valence'] > 0.6
+                    is_energetic = avg_features['energy'] > 0.6
+                    is_dance = avg_features['danceability'] > 0.6
+                    
+                    # Check description for mood indicators
+                    if any(term in playlist_description.lower() for term in ['happy', 'upbeat', 'cheerful', 'joyful']):
+                        playlist_mood = "happy"
+                    elif any(term in playlist_description.lower() for term in ['sad', 'melancholic', 'emotional', 'heartbreak']):
+                        playlist_mood = "sad"
+                    elif any(term in playlist_description.lower() for term in ['energetic', 'workout', 'pump', 'energy']):
+                        playlist_mood = "energetic"
+                    elif any(term in playlist_description.lower() for term in ['chill', 'relax', 'calm', 'study']):
+                        playlist_mood = "chill"
+                    elif is_happy:
+                        playlist_mood = "happy"
+                    elif is_energetic:
+                        playlist_mood = "energetic"
+                    elif is_dance:
+                        playlist_mood = "dance"
+                    
+                    # Use a mix of recommendations based on our best tracks, genres, and audio features
+                    seed_tracks = []
                     seed_artists = []
                     seed_genres = []
                     
-                    # Add top artists as seeds if we don't have enough tracks
-                    if len(seed_tracks) < 2 and top_artists.get('items'):
-                        for artist in top_artists['items'][:2]:
-                            if len(seed_artists) + len(seed_tracks) < 4:  # Keep total seeds under 5
-                                seed_artists.append(artist['id'])
+                    # Pick best seed tracks based on popularity if we have any tracks
+                    if track_uris:
+                        # Get full track objects to check popularity
+                        tracks_url = "https://api.spotify.com/v1/tracks"
+                        params = {"ids": ",".join([uri.split(":")[-1] for uri in track_uris[:10]])}
+                        tracks_res = requests.get(
+                            tracks_url, 
+                            headers={"Authorization": f"Bearer {session['token_info']['access_token']}"},
+                            params=params
+                        )
+                        
+                        if tracks_res.status_code == 200:
+                            full_tracks = tracks_res.json().get('tracks', [])
+                            # Sort by popularity and take the top 2
+                            full_tracks.sort(key=lambda x: x.get('popularity', 0), reverse=True)
+                            seed_tracks = [track['id'] for track in full_tracks[:2] if track and 'id' in track]
                     
-                    # Add genres if we still need more seeds
-                    if len(seed_tracks) + len(seed_artists) < 4 and top_artist_genres:
-                        valid_genres = ['pop', 'rock', 'hip-hop', 'country', 'electronic', 'jazz', 'indie', 'folk', 'r-n-b', 'latin']
+                    # Extract genres from the description
+                    description_lower = playlist_description.lower()
+                    possible_genres = [
+                        'rock', 'pop', 'hip-hop', 'rap', 'r&b', 'country', 'folk', 'jazz',
+                        'blues', 'electronic', 'dance', 'indie', 'classical', 'metal',
+                        'alternative', 'punk', 'soul', 'reggae', 'funk', 'disco',
+                        'techno', 'house', 'ambient', 'edm', 'lo-fi', 'latin'
+                    ]
+                    
+                    detected_genres = []
+                    for genre in possible_genres:
+                        if genre in description_lower or f"{genre} music" in description_lower:
+                            detected_genres.append(genre)
+                    
+                    # Add genres from description first
+                    for genre in detected_genres[:2]:  # Max 2 genres from description
+                        if len(seed_genres) + len(seed_tracks) + len(seed_artists) < 5:
+                            seed_genres.append(genre)
+                    
+                    # If we still have room, add genres from user's top genres
+                    if top_artist_genres and len(seed_genres) + len(seed_tracks) + len(seed_artists) < 5:
+                        valid_genres = set(possible_genres + ['r-n-b'])  # Spotify uses r-n-b instead of r&b
                         for genre in top_artist_genres:
                             if genre in valid_genres and len(seed_genres) + len(seed_tracks) + len(seed_artists) < 5:
-                                seed_genres.append(genre)
+                                if genre not in seed_genres:  # Avoid duplicates
+                                    seed_genres.append(genre)
                     
+                    # If we still need more seeds, add top artists
+                    if top_artists.get('items') and len(seed_genres) + len(seed_tracks) + len(seed_artists) < 5:
+                        for artist in top_artists['items']:
+                            if len(seed_artists) + len(seed_tracks) + len(seed_genres) < 5:
+                                # Check if this artist's genre matches our playlist
+                                if not detected_genres or any(genre in artist.get('genres', []) for genre in detected_genres):
+                                    seed_artists.append(artist['id'])
+                    
+                    # Check if we have enough seeds
                     if seed_tracks or seed_artists or seed_genres:
+                        # Set up recommendation parameters based on playlist mood and audio features
                         recommendation_params = {
-                            'limit': 20 - len(tracks),  # Add enough to reach 20 total
+                            'limit': min(30, 20 - len(tracks)),  # Request more than needed to allow filtering
                             'market': 'US'
                         }
                         
+                        # Add seed parameters
                         if seed_tracks:
                             recommendation_params['seed_tracks'] = ','.join(seed_tracks[:2])
                         if seed_artists:
@@ -846,24 +1110,57 @@ ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions and
                         if seed_genres:
                             recommendation_params['seed_genres'] = ','.join(seed_genres[:2])
                         
+                        # Set target audio features based on the playlist type
+                        if playlist_mood == "happy":
+                            recommendation_params['target_valence'] = min(0.9, avg_features['valence'] + 0.1)
+                            recommendation_params['target_energy'] = min(0.9, avg_features['energy'] + 0.1)
+                        elif playlist_mood == "sad":
+                            recommendation_params['target_valence'] = max(0.1, avg_features['valence'] - 0.1)
+                            recommendation_params['target_energy'] = max(0.1, avg_features['energy'] - 0.1)
+                        elif playlist_mood == "energetic":
+                            recommendation_params['target_energy'] = min(0.95, avg_features['energy'] + 0.2)
+                            recommendation_params['min_tempo'] = avg_features['tempo'] * 0.9
+                        elif playlist_mood == "chill":
+                            recommendation_params['target_energy'] = max(0.1, avg_features['energy'] - 0.2)
+                            recommendation_params['target_acousticness'] = 0.7
+                        elif playlist_mood == "dance":
+                            recommendation_params['target_danceability'] = min(0.95, avg_features['danceability'] + 0.2)
+                        else:
+                            # Use the average features with slight adjustments for consistency
+                            recommendation_params['target_danceability'] = avg_features['danceability']
+                            recommendation_params['target_energy'] = avg_features['energy']
+                            recommendation_params['target_valence'] = avg_features['valence']
+                        
+                        logger.info(f"Recommendation parameters: {recommendation_params}")
                         recommendations = sp._get('recommendations', params=recommendation_params)
                         
                         if recommendations and recommendations.get('tracks'):
                             # Add only tracks from artists we haven't included yet
-                            for rec_track in recommendations['tracks']:
+                            recommended_tracks = recommendations['tracks']
+                            
+                            # Sort by popularity for better quality recommendations
+                            recommended_tracks.sort(key=lambda x: x.get('popularity', 0), reverse=True)
+                            
+                            added_count = 0
+                            for rec_track in recommended_tracks:
                                 rec_artist = rec_track['artists'][0]['name'].lower()
                                 if rec_artist not in added_artists and len(tracks) < 20:
-                                    added_artists.add(rec_artist)
-                                    track_uris.append(rec_track['uri'])
-                                    tracks.append({
-                                        'name': rec_track['name'],
-                                        'artist': rec_track['artists'][0]['name'],
-                                        'album_image': rec_track['album']['images'][0]['url'] if rec_track['album']['images'] else None
-                                    })
-                        
-                        logger.info(f"Added {len(tracks) - len(song_list)} recommendation tracks, total: {len(tracks)}")
+                                    # Verify the track isn't a cover, remix, etc.
+                                    if not any(keyword in rec_track['name'].lower() for keyword in 
+                                            ['karaoke', 'tribute', 'cover', 'made famous', 'instrumental', 'remake']):
+                                        added_artists.add(rec_artist)
+                                        track_uris.append(rec_track['uri'])
+                                        tracks.append({
+                                            'name': rec_track['name'],
+                                            'artist': rec_track['artists'][0]['name'],
+                                            'album_image': rec_track['album']['images'][0]['url'] if rec_track['album']['images'] else None
+                                        })
+                                        added_count += 1
+                            
+                            logger.info(f"Added {added_count} recommendation tracks, total: {len(tracks)}")
                 except Exception as e:
                     logger.warning(f"Error adding recommendation tracks: {str(e)}")
+                    logger.exception(e)
 
             # Create playlist
             create_playlist_url = f"https://api.spotify.com/v1/users/{session['user']['id']}/playlists"
