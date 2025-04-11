@@ -59,51 +59,56 @@ logger = logging.getLogger(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Must be 'None' for cross-site requests
 app.config['SESSION_COOKIE_DOMAIN'] = None
-app.config['PERMANENT_SESSION_LIFETIME'] = 86400
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
 app.config['SESSION_COOKIE_PATH'] = '/'
 app.config['SESSION_COOKIE_NAME'] = 'moosic_session'
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
 app.config['SESSION_USE_SIGNER'] = True
+app.config['SESSION_PERMANENT'] = True  # Make all sessions permanent by default
 
 # Make sessions permanent by default
 @app.before_request
-def make_session_permanent():
+def setup_session():
     session.permanent = True
+    # Force the session to be saved immediately
+    if request.path.startswith('/api/callback'):
+        logger.info("Callback route detected, ensuring session persistence")
 
 # Initialize Flask-Session
 Session(app)
 
-# Configure CORS with more permissive settings
-CORS(app, resources={
-    r"/api/*": {
-        "origins": [os.environ['FRONTEND_URL']],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "Accept"],
-        "supports_credentials": True,
-        "expose_headers": ["Content-Type", "Authorization", "Set-Cookie"],
-        "allow_credentials": True,
-        "max_age": 3600
-    }
-})
+# Configure CORS
+CORS(app, 
+     origins=[os.environ['FRONTEND_URL']], 
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "Accept"],
+     methods=["GET", "POST", "OPTIONS"],
+     expose_headers=["Content-Type", "Authorization", "Set-Cookie"]
+)
 
 @app.after_request
 def after_request(response):
-    # Don't override CORS headers for OPTIONS requests
-    if request.method != 'OPTIONS':
-        response.headers.add('Access-Control-Allow-Origin', os.environ['FRONTEND_URL'])
+    origin = request.headers.get('Origin', '')
+    # Only apply CORS headers to requests from our frontend
+    if origin == os.environ['FRONTEND_URL']:
+        response.headers.add('Access-Control-Allow-Origin', origin)
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
         response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie')
         response.headers.add('Access-Control-Max-Age', '3600')
     
-    # Ensure the session is saved
-    if not request.cookies.get(app.config['SESSION_COOKIE_NAME']) and 'token_info' in session:
-        logger.info("Session cookie not present in request. Forcing session save.")
-        session.modified = True
+    # Log response cookies for debugging
+    if 'Set-Cookie' in response.headers:
+        logger.info(f"Setting cookies in response: {response.headers.getlist('Set-Cookie')}")
+    
+    # Set additional headers for SameSite=None to work properly
+    if app.config['SESSION_COOKIE_SAMESITE'] == 'None' and app.config['SESSION_COOKIE_NAME'] in request.cookies:
+        cookie = f"{app.config['SESSION_COOKIE_NAME']}={request.cookies[app.config['SESSION_COOKIE_NAME']]}; Path=/; SameSite=None; Secure; HttpOnly"
+        response.headers.add('Set-Cookie', cookie)
         
     return response
 

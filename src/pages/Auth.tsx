@@ -177,12 +177,32 @@ const Auth: React.FC = () => {
             throw new Error(errorMessage);
           }
           
+          const data = await response.json();
+          console.log('Authentication successful, user data:', data.user);
+          
           // Clear the code verifier
           localStorage.removeItem('code_verifier');
           
-          // Success - update auth status and redirect
+          // Success - update auth status
           setIsAuthenticated(true);
           setAuthStatus('authenticated');
+          
+          // Wait a moment to ensure cookies are set before redirecting
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          console.log('Checking cookies before redirect...');
+          const checkResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/check-auth`, {
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            }
+          });
+          
+          const checkData = await checkResponse.json();
+          console.log('Final auth check before redirect:', checkData);
+          
+          // Navigate to home page
           navigate('/?auth=success');
         } catch (error) {
           console.error('Error during callback:', error);

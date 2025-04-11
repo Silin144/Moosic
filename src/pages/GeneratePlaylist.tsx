@@ -30,12 +30,23 @@ interface PlaylistPreview {
 
 const GeneratePlaylist: React.FC = () => {
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, fetchWithAuth, checkAuthStatus } = useAuth()
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [playlistPreview, setPlaylistPreview] = useState<PlaylistPreview | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
+
+  // Check auth status when component mounts
+  React.useEffect(() => {
+    const verifyAuth = async () => {
+      const isAuth = await checkAuthStatus();
+      if (!isAuth) {
+        navigate('/auth');
+      }
+    };
+    verifyAuth();
+  }, [checkAuthStatus, navigate]);
 
   const handleGenerate = async () => {
     if (!isAuthenticated) {
@@ -53,12 +64,9 @@ const GeneratePlaylist: React.FC = () => {
       setError(null)
       setPlaylistPreview(null)
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate-playlist`, {
+      // Use fetchWithAuth instead of fetch
+      const response = await fetchWithAuth(`${import.meta.env.VITE_API_URL}/api/generate-playlist`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
         body: JSON.stringify({ description: description.trim() }),
       })
 
@@ -71,7 +79,13 @@ const GeneratePlaylist: React.FC = () => {
       setPlaylistPreview(data)
       setShowSuccess(true)
     } catch (err) {
+      console.error('Generate playlist error:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate playlist')
+      
+      // If we got a 401, we need to redirect to auth
+      if (err instanceof Error && err.message === 'Not authenticated') {
+        navigate('/auth');
+      }
     } finally {
       setLoading(false)
     }
