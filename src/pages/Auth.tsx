@@ -72,8 +72,8 @@ const Auth: React.FC = () => {
     try {
       // Generate a random state parameter
       const state = generateRandomString(16)
-      // Store state in localStorage for verification
-      localStorage.setItem('spotify_auth_state', state)
+      // Store state in sessionStorage (more secure than localStorage)
+      sessionStorage.setItem('spotify_auth_state', state)
 
       // Clear any existing session data
       document.cookie.split(";").forEach(function(c) { 
@@ -114,15 +114,16 @@ const Auth: React.FC = () => {
       }
       
       // Verify state parameter
-      const storedState = localStorage.getItem('spotify_auth_state')
-      if (!state || state !== storedState) {
+      const storedState = sessionStorage.getItem('spotify_auth_state')
+      if (!state || !storedState || state !== storedState) {
+        console.error('State mismatch:', { received: state, stored: storedState })
         setAuthStatus('error')
         setError('State mismatch')
         return
       }
       
-      // Clear the state from localStorage
-      localStorage.removeItem('spotify_auth_state')
+      // Clear the state from sessionStorage
+      sessionStorage.removeItem('spotify_auth_state')
       
       if (code) {
         try {
@@ -134,7 +135,8 @@ const Auth: React.FC = () => {
             },
             body: JSON.stringify({
               code,
-              redirect_uri: import.meta.env.VITE_SPOTIFY_REDIRECT_URI
+              redirect_uri: import.meta.env.VITE_SPOTIFY_REDIRECT_URI,
+              state: state // Send the state to the backend for verification
             }),
             credentials: 'include'
           })
