@@ -80,13 +80,13 @@ CORS(app, resources={
     }
 })
 
-# Add error handler for CORS
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', os.environ['FRONTEND_URL'])
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie')
     return response
 
 # Configure for environment

@@ -61,7 +61,10 @@ const Auth: React.FC = () => {
       document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
     })
     
-    window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
+    // Add a small delay to ensure cookies are cleared
+    setTimeout(() => {
+      window.location.href = `${import.meta.env.VITE_API_URL}/api/login`
+    }, 100)
   }
 
   if (authStatus === 'checking') {
