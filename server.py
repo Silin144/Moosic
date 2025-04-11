@@ -121,7 +121,7 @@ sp_oauth = SpotifyOAuth(
     client_id=os.getenv('SPOTIFY_CLIENT_ID'),
     client_secret=os.getenv('SPOTIFY_CLIENT_SECRET'),
     redirect_uri=os.getenv('SPOTIFY_REDIRECT_URI'),
-    scope='playlist-modify-public playlist-modify-private user-read-private user-read-email',
+    scope='playlist-modify-public playlist-modify-private user-read-private user-read-email user-top-read',
     state='moosic_state',  # Add state parameter for security
     show_dialog=True  # Force user to approve the app each time
 )
@@ -200,7 +200,7 @@ def login():
             'response_type': 'code',
             'redirect_uri': os.getenv('SPOTIFY_REDIRECT_URI'),
             'state': state,
-            'scope': 'playlist-modify-public playlist-modify-private user-read-private user-read-email',
+            'scope': 'playlist-modify-public playlist-modify-private user-read-private user-read-email user-top-read',
             'code_challenge_method': code_challenge_method,
             'code_challenge': code_challenge,
             'show_dialog': 'true'
@@ -838,6 +838,33 @@ ALWAYS DOUBLE-CHECK your song list to ensure it contains NO karaoke versions and
     except Exception as e:
         logger.error(f"Error in generate-playlist route: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/api/user/top-tracks')
+def get_top_tracks():
+    try:
+        logger.info("Getting user's top tracks")
+        sp = get_spotify_client()
+        
+        # Get user's top tracks (short_term = ~4 weeks, medium_term = ~6 months, long_term = several years)
+        top_tracks_response = sp.current_user_top_tracks(limit=20, time_range='medium_term')
+        
+        tracks = []
+        for item in top_tracks_response['items']:
+            track = {
+                'id': item['id'],
+                'name': item['name'],
+                'artist': item['artists'][0]['name'] if item['artists'] else 'Unknown Artist',
+                'album_image': item['album']['images'][0]['url'] if item['album']['images'] else None,
+                'preview_url': item['preview_url']
+            }
+            tracks.append(track)
+        
+        return jsonify({
+            'tracks': tracks
+        })
+    except Exception as e:
+        logger.error(f"Error getting top tracks: {str(e)}")
+        return jsonify({'error': str(e)}), 401
 
 def retry_with_backoff(func, max_retries=3, initial_delay=1):
     """Retry a function with exponential backoff"""

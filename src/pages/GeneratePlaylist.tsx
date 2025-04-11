@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Box,
@@ -44,11 +44,20 @@ import MenuItem from '@mui/material/MenuItem'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import PauseIcon from '@mui/icons-material/Pause'
 
 interface Track {
   name: string
   artist: string
   album_image: string
+}
+
+interface TopTrack {
+  id: string
+  name: string
+  artist: string
+  album_image: string
+  preview_url: string | null
 }
 
 interface PlaylistPreview {
@@ -69,6 +78,10 @@ const GeneratePlaylist: React.FC = () => {
   const [authChecked, setAuthChecked] = useState(false)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [hoverTrack, setHoverTrack] = useState<number | null>(null)
+  const [topTracks, setTopTracks] = useState<TopTrack[]>([])
+  const [loadingTopTracks, setLoadingTopTracks] = useState(false)
+  const [topTracksError, setTopTracksError] = useState<string | null>(null)
+  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null)
 
   // Check auth status only once when component mounts
   React.useEffect(() => {
@@ -84,6 +97,59 @@ const GeneratePlaylist: React.FC = () => {
       verifyAuth();
     }
   }, [authChecked, isAuthenticated, checkAuthStatus, navigate]);
+
+  // Fetch user's top tracks when authenticated
+  useEffect(() => {
+    const fetchTopTracks = async () => {
+      if (!isAuthenticated) return;
+      
+      try {
+        setLoadingTopTracks(true);
+        setTopTracksError(null);
+        
+        const response = await fetchWithAuth(`${import.meta.env.VITE_API_URL}/api/user/top-tracks`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch top tracks');
+        }
+        
+        const data = await response.json();
+        setTopTracks(data.tracks || []);
+      } catch (err) {
+        console.error('Error fetching top tracks:', err);
+        setTopTracksError(err instanceof Error ? err.message : 'Failed to fetch top tracks');
+      } finally {
+        setLoadingTopTracks(false);
+      }
+    };
+    
+    fetchTopTracks();
+  }, [isAuthenticated, fetchWithAuth]);
+
+  const handlePlayPreview = (trackId: string, previewUrl: string | null) => {
+    if (!previewUrl) return;
+    
+    if (currentlyPlaying === trackId) {
+      // Stop playing
+      const audioElements = document.getElementsByTagName('audio');
+      for (let i = 0; i < audioElements.length; i++) {
+        audioElements[i].pause();
+      }
+      setCurrentlyPlaying(null);
+    } else {
+      // Stop any currently playing audio
+      const audioElements = document.getElementsByTagName('audio');
+      for (let i = 0; i < audioElements.length; i++) {
+        audioElements[i].pause();
+      }
+      
+      // Play the new track
+      const audio = new Audio(previewUrl);
+      audio.play();
+      audio.addEventListener('ended', () => setCurrentlyPlaying(null));
+      setCurrentlyPlaying(trackId);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!isAuthenticated) {
@@ -233,6 +299,142 @@ const GeneratePlaylist: React.FC = () => {
             </Typography>
           </motion.div>
         </Box>
+
+        {/* Top Tracks Section - show only when no playlist is being previewed */}
+        {!playlistPreview && topTracks.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                p: 4, 
+                background: alpha(theme.palette.background.paper, 0.8),
+                backdropFilter: 'blur(10px)',
+                borderRadius: 4,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                maxWidth: '900px',
+                mx: 'auto',
+                mb: 6
+              }}
+            >
+              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <FavoriteIcon color="primary" sx={{ fontSize: 30 }} />
+                  <Typography variant="h4" fontWeight="600">
+                    Your Top Tracks
+                  </Typography>
+                </Box>
+                <Button 
+                  variant="outlined" 
+                  size="small"
+                  startIcon={<PlaylistAddIcon />}
+                  onClick={() => {
+                    setDescription("Create a playlist based on my top tracks with similar vibes");
+                  }}
+                >
+                  Generate Similar Playlist
+                </Button>
+              </Box>
+              
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                These are your most listened tracks on Spotify. Use them as inspiration for your next playlist!
+              </Typography>
+
+              {loadingTopTracks ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : topTracksError ? (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                  {topTracksError}
+                </Alert>
+              ) : (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  {topTracks.slice(0, 8).map((track, index) => (
+                    <Box 
+                      key={track.id}
+                      sx={{ 
+                        width: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(25% - 16px)' }
+                      }}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                      >
+                        <Card 
+                          sx={{ 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            height: '100%',
+                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                            '&:hover': {
+                              transform: 'translateY(-4px)',
+                              boxShadow: (theme) => `0 8px 20px ${alpha(theme.palette.common.black, 0.15)}`
+                            }
+                          }}
+                        >
+                          <Box sx={{ position: 'relative' }}>
+                            <CardMedia
+                              component="img"
+                              height="160"
+                              image={track.album_image || 'https://via.placeholder.com/160?text=Album+Cover'}
+                              alt={track.name}
+                            />
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                bgcolor: 'rgba(0,0,0,0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: 0,
+                                transition: 'opacity 0.3s ease',
+                                '&:hover': {
+                                  opacity: 1
+                                }
+                              }}
+                            >
+                              {track.preview_url && (
+                                <IconButton
+                                  onClick={() => handlePlayPreview(track.id, track.preview_url)}
+                                  sx={{ 
+                                    color: 'white',
+                                    bgcolor: 'rgba(0,0,0,0.4)',
+                                    '&:hover': {
+                                      bgcolor: 'rgba(0,0,0,0.6)'
+                                    }
+                                  }}
+                                >
+                                  {currentlyPlaying === track.id ? <PauseIcon /> : <PlayArrowIcon />}
+                                </IconButton>
+                              )}
+                            </Box>
+                          </Box>
+                          <CardContent sx={{ flexGrow: 1 }}>
+                            <Typography variant="subtitle1" component="div" noWrap title={track.name} fontWeight="medium">
+                              {track.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" noWrap>
+                              {track.artist}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Paper>
+          </motion.div>
+        )}
 
         {!playlistPreview ? (
           <motion.div
