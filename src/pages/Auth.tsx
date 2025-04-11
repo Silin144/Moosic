@@ -90,9 +90,9 @@ const Auth: React.FC = () => {
     
     // Build authorization URL
     const params = new URLSearchParams({
-        client_id: process.env.REACT_APP_SPOTIFY_CLIENT_ID || '',
+        client_id: import.meta.env.VITE_SPOTIFY_CLIENT_ID || '',
         response_type: 'code',
-        redirect_uri: process.env.REACT_APP_REDIRECT_URI || '',
+        redirect_uri: import.meta.env.VITE_SPOTIFY_REDIRECT_URI || '',
         state: state,
         code_challenge_method: 'S256',
         code_challenge: codeChallenge,
