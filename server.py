@@ -634,12 +634,45 @@ def generate_playlist():
         
         logger.info(f"Generating playlist with description: {playlist_description[:50]}...")
 
-        # Get Spotify client with valid token
+        # Ensure we have a valid token by forcing a refresh if it's close to expiration
         try:
+            now = int(time.time())
+            token_info = session['token_info']
+            
+            # Force refresh if token will expire in the next 10 minutes (600 seconds)
+            if token_info['expires_at'] - now < 600:
+                logger.info("Token expires soon, refreshing before playlist generation")
+                token_url = 'https://accounts.spotify.com/api/token'
+                response = requests.post(
+                    token_url,
+                    data={
+                        'grant_type': 'refresh_token',
+                        'refresh_token': token_info['refresh_token'],
+                        'client_id': os.environ['SPOTIFY_CLIENT_ID'],
+                        'client_secret': os.environ['SPOTIFY_CLIENT_SECRET']
+                    },
+                    headers={
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                )
+                
+                if response.status_code == 200:
+                    token_data = response.json()
+                    session['token_info'] = {
+                        'access_token': token_data['access_token'],
+                        'refresh_token': token_info['refresh_token'],
+                        'expires_at': int(time.time()) + token_data['expires_in']
+                    }
+                    session.modified = True
+                    logger.info("Successfully refreshed token before playlist generation")
+                else:
+                    logger.error(f"Failed to refresh token: {response.status_code} - {response.text}")
+            
+            # Get client with fresh token
             sp = get_spotify_client()
-            logger.info("Successfully created Spotify client")
+            logger.info("Successfully created Spotify client with fresh token")
         except Exception as e:
-            logger.error(f"Failed to create Spotify client: {str(e)}")
+            logger.error(f"Failed to ensure valid token: {str(e)}")
             return jsonify({"error": "Authentication error", "details": str(e)}), 401
             
         # Get user's top artists to improve recommendations
@@ -694,7 +727,7 @@ Based on your analysis, provide 15-20 highly relevant songs that precisely match
 """
             
             completion = openai.ChatCompletion.create(
-                model="gpt-4-turbo-preview",  # Using GPT-4 Turbo for better music knowledge
+                model="gpt-4o",  # Using GPT-4o for superior music knowledge and taste
                 messages=[
                     {
                         "role": "system",
@@ -732,11 +765,11 @@ Only list song recommendations - do not include introductions, explanations, or 
                         "content": prompt_analysis
                     }
                 ],
-                temperature=0.7,
+                temperature=0.75,
                 max_tokens=1500,
                 top_p=0.9,
-                presence_penalty=0.3,
-                frequency_penalty=0.5
+                presence_penalty=0.4,
+                frequency_penalty=0.6
             )
             
             # Process the GPT response to extract songs
@@ -829,64 +862,55 @@ Only list song recommendations - do not include introductions, explanations, or 
                             
                         try:
                             params = {"q": strategy["query"], "type": "track", "limit": 5, "market": "US"}
-                            res = requests.get(search_url, headers=headers, params=params)
                             
-                            if res.status_code == 200:
-                                search_results = res.json()
-                                items = search_results.get('tracks', {}).get('items', [])
+                            # Add retry logic with backoff for search requests
+                            def search_request():
+                                search_response = requests.get(
+                                    search_url, 
+                                    headers=headers, 
+                                    params=params, 
+                                    timeout=10  # Add timeout to prevent hanging
+                                )
+                                if search_response.status_code != 200:
+                                    logger.error(f"Search API error: {search_response.status_code} - {search_response.text}")
+                                    search_response.raise_for_status()
+                                return search_response.json()
+                            
+                            # Use retry with backoff for search
+                            try:
+                                search_results = retry_with_backoff(
+                                    search_request, 
+                                    max_retries=2,  # Fewer retries for search to avoid slowdowns
+                                    initial_delay=0.5
+                                )
+                            except Exception as search_err:
+                                logger.warning(f"Search failed after retries: {str(search_err)}")
+                                continue  # Try next search strategy
+                            
+                            items = search_results.get('tracks', {}).get('items', [])
+                            
+                            if not items:
+                                logger.info(f"No results for '{clean_track_name}' by '{clean_artist_name}' using {strategy['description']}")
+                                continue
+                            
+                            # Filter out suspicious tracks
+                            filtered_items = [
+                                item for item in items 
+                                if not any(keyword in item['name'].lower() for keyword in 
+                                          ['karaoke', 'tribute', 'cover', 'made famous', 'instrumental', 'remake'])
+                            ]
+                            
+                            if filtered_items:
+                                # Sort by popularity
+                                filtered_items.sort(key=lambda x: x.get('popularity', 0), reverse=True)
+                                track = filtered_items[0]
                                 
-                                if not items:
-                                    logger.info(f"No results for '{clean_track_name}' by '{clean_artist_name}' using {strategy['description']}")
-                                    continue
-                                
-                                # Filter out suspicious tracks
-                                filtered_items = [
-                                    item for item in items 
-                                    if not any(keyword in item['name'].lower() for keyword in 
-                                              ['karaoke', 'tribute', 'cover', 'made famous', 'instrumental', 'remake', 'originally performed', 'as made famous'])
-                                ]
-                                
-                                if not filtered_items:
-                                    logger.info(f"No clean results for '{clean_track_name}' by '{clean_artist_name}' after filtering")
-                                    continue
-                                
-                                # Sort by match quality and popularity
-                                # First prioritize exact name matches, then by popularity
-                                exact_matches = [
-                                    item for item in filtered_items 
-                                    if item['name'].lower() == clean_track_name.lower() and 
-                                    any(artist['name'].lower() == clean_artist_name.lower() for artist in item['artists'])
-                                ]
-                                
-                                if exact_matches:
-                                    # Sort exact matches by popularity
-                                    exact_matches.sort(key=lambda x: x.get('popularity', 0), reverse=True)
-                                    track = exact_matches[0]
-                                else:
-                                    # Sort by popularity otherwise
-                                    filtered_items.sort(key=lambda x: x.get('popularity', 0), reverse=True)
-                                    track = filtered_items[0]
-                                
-                                # Check artist name to make sure we have a reasonable match
+                                # Check for duplicate artists
                                 track_artist = track['artists'][0]['name'].lower()
                                 if track_artist in added_artists:
-                                    logger.info(f"Skipping duplicate artist (after search): {track_artist}")
-                                    found_track = True  # Consider this "found" to avoid additional searches
+                                    logger.info(f"Skipping duplicate artist (fallback search): {track_artist}")
                                     continue
-                                
-                                # Check if this is truly a good match
-                                # Use Levenshtein distance for fuzzy matching
-                                artist_match = any(
-                                    self_similar(clean_artist_name.lower(), artist['name'].lower(), 0.8) 
-                                    for artist in track['artists']
-                                )
-                                
-                                if not artist_match:
-                                    logger.info(f"Artist mismatch: Expected '{clean_artist_name}', got '{track['artists'][0]['name']}'")
-                                    # If it's not the first strategy, skip this result
-                                    if strategy != search_strategies[0]:
-                                        continue
-                                
+                                    
                                 added_artists.add(track_artist)
                                 track_uris.append(track['uri'])
                                 tracks.append({
@@ -945,6 +969,13 @@ Only list song recommendations - do not include introductions, explanations, or 
                     except Exception as e:
                         logger.warning(f"Failed general search for '{song}': {str(e)}")
 
+            # Log summary of tracks found
+            if tracks:
+                logger.info(f"Successfully found {len(tracks)} tracks from song suggestions")
+                logger.info(f"First few tracks: {', '.join([f'{t['name']} by {t['artist']}' for t in tracks[:3]])}")
+            else:
+                logger.warning("No tracks found from song suggestions")
+
             # Function to check string similarity (for artist name matching)
             def self_similar(str1, str2, threshold=0.8):
                 """Check if two strings are similar using character-level comparison."""
@@ -964,6 +995,60 @@ Only list song recommendations - do not include introductions, explanations, or 
                 jaccard = len(intersection) / len(union) if union else 0
                 return jaccard >= threshold
 
+            # Create playlist only if we have enough tracks or can get recommendations
+            if len(tracks) == 0:
+                logger.error("No tracks found for playlist")
+                return jsonify({"error": "No tracks found matching your request. Please try with a different description."}), 400
+            
+            # If we found fewer than minimum tracks (5), add fallback popular tracks based on described genres
+            if len(tracks) < 5:
+                logger.warning(f"Only found {len(tracks)} tracks, adding fallback popular tracks")
+                
+                # Try to extract genres from the description
+                possible_genres = [
+                    'pop', 'rock', 'hip-hop', 'rap', 'r&b', 'country', 'folk', 'jazz',
+                    'blues', 'electronic', 'dance', 'indie', 'classical', 'metal'
+                ]
+                
+                detected_genres = []
+                description_lower = playlist_description.lower()
+                
+                for genre in possible_genres:
+                    if genre in description_lower:
+                        detected_genres.append(genre)
+                
+                # If no genres detected, use general popular tracks
+                if not detected_genres:
+                    detected_genres = ['pop']
+                
+                # Get popular tracks for each detected genre
+                for genre in detected_genres[:3]:  # Limit to 3 genres
+                    try:
+                        search_query = f"genre:{genre}"
+                        popular_tracks_response = sp.search(q=search_query, type='track', limit=10, market='US')
+                        
+                        for item in popular_tracks_response['tracks']['items']:
+                            # Skip if we already have a track by this artist
+                            track_artist = item['artists'][0]['name'].lower()
+                            if track_artist in added_artists:
+                                continue
+                                
+                            added_artists.add(track_artist)
+                            track_uris.append(item['uri'])
+                            tracks.append({
+                                'name': item['name'],
+                                'artist': item['artists'][0]['name'],
+                                'album_image': item['album']['images'][0]['url'] if item['album']['images'] else None
+                            })
+                            
+                            # Stop if we have enough tracks
+                            if len(tracks) >= 15:
+                                break
+                    except Exception as e:
+                        logger.warning(f"Error getting popular {genre} tracks: {str(e)}")
+                
+                logger.info(f"Added fallback popular tracks, now have {len(tracks)} tracks total")
+            
             # Try to reach at least 15 tracks by adding related tracks if needed
             if len(tracks) < 15:
                 logger.info(f"Only found {len(tracks)} tracks, adding related tracks to reach 15-20 total")
@@ -1171,39 +1256,71 @@ Only list song recommendations - do not include introductions, explanations, or 
                 "public": False
             }
             
-            create_res = requests.post(
-                create_playlist_url,
-                headers={"Authorization": f"Bearer {session['token_info']['access_token']}"},
-                json=payload
-            )
-            
-            if create_res.status_code != 201:
-                logger.error(f"Failed to create playlist: {create_res.status_code} - {create_res.text}")
-                return jsonify({"error": "Failed to create playlist"}), 400
+            try:
+                # Use retry_with_backoff for playlist creation
+                def create_playlist_request():
+                    response = requests.post(
+                        create_playlist_url,
+                        headers={"Authorization": f"Bearer {session['token_info']['access_token']}"},
+                        json=payload
+                    )
+                    if response.status_code != 201:
+                        logger.error(f"Failed to create playlist: {response.status_code} - {response.text}")
+                        response.raise_for_status()
+                    return response.json()
                 
-            playlist_data = create_res.json()
-            playlist_id = playlist_data['id']
-
-            # Add tracks to playlist
-            add_tracks_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
-            add_payload = {"uris": track_uris}
-            
-            add_res = requests.post(
-                add_tracks_url,
-                headers={"Authorization": f"Bearer {session['token_info']['access_token']}"},
-                json=add_payload
-            )
-            
-            if add_res.status_code != 201:
-                logger.error(f"Failed to add tracks: {add_res.status_code} - {add_res.text}")
-                return jsonify({"error": "Failed to add tracks to playlist"}), 400
-
-            return jsonify({
-                "success": True,
-                "playlist_url": playlist_data['external_urls']['spotify'],
-                "playlist_name": playlist_data['name'],
-                "tracks": tracks
-            })
+                playlist_data = retry_with_backoff(create_playlist_request, max_retries=3, initial_delay=1)
+                playlist_id = playlist_data['id']
+                logger.info(f"Successfully created playlist with ID: {playlist_id}")
+                
+                # Add tracks to playlist in chunks to avoid request size limitations
+                if track_uris:
+                    # Split into chunks of 100 tracks (Spotify API limit)
+                    def chunks(lst, n):
+                        for i in range(0, len(lst), n):
+                            yield lst[i:i + n]
+                    
+                    track_uri_chunks = list(chunks(track_uris, 100))
+                    
+                    for i, chunk in enumerate(track_uri_chunks):
+                        def add_tracks_request():
+                            add_tracks_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+                            add_payload = {"uris": chunk}
+                            
+                            add_res = requests.post(
+                                add_tracks_url,
+                                headers={"Authorization": f"Bearer {session['token_info']['access_token']}"},
+                                json=add_payload
+                            )
+                            
+                            if add_res.status_code not in [201, 200]:
+                                logger.error(f"Failed to add tracks (chunk {i+1}/{len(track_uri_chunks)}): {add_res.status_code} - {add_res.text}")
+                                add_res.raise_for_status()
+                            return add_res.json()
+                        
+                        # Retry adding tracks with exponential backoff
+                        retry_with_backoff(add_tracks_request, max_retries=3, initial_delay=1)
+                        logger.info(f"Added track chunk {i+1}/{len(track_uri_chunks)} ({len(chunk)} tracks) to playlist {playlist_id}")
+                else:
+                    logger.warning("No tracks to add to playlist")
+                
+                return jsonify({
+                    "success": True,
+                    "playlist_url": playlist_data['external_urls']['spotify'],
+                    "playlist_name": playlist_data['name'],
+                    "tracks": tracks
+                })
+                
+            except requests.exceptions.HTTPError as http_err:
+                logger.error(f"HTTP error occurred: {http_err}")
+                # Check if token expired
+                if http_err.response.status_code == 401:
+                    return jsonify({"error": "Authentication expired. Please log in again."}), 401
+                return jsonify({"error": f"Failed to create or update playlist: {str(http_err)}"}), http_err.response.status_code
+            except Exception as e:
+                logger.error(f"Error creating playlist: {str(e)}")
+                logger.exception(e)
+                return jsonify({"error": f"Failed to create playlist: {str(e)}"}), 500
 
         except Exception as e:
             logger.error(f"Error in playlist generation: {str(e)}")
