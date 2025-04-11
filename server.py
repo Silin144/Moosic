@@ -11,6 +11,7 @@ from spotipy.oauth2 import SpotifyOAuth
 import openai
 from dotenv import load_dotenv
 import requests
+import secrets
 
 # Load environment variables
 load_dotenv()
@@ -140,9 +141,10 @@ def login():
             logger.error("Missing or invalid PKCE parameters")
             return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Invalid%20PKCE%20parameters")
         
-        # Generate state parameter
-        state = 'moosic_state'
+        # Generate a unique state parameter
+        state = secrets.token_urlsafe(16)
         session['oauth_state'] = state
+        session.modified = True  # Force session to be saved
         
         # Get authorization URL with PKCE parameters
         auth_url = sp_oauth.get_authorize_url(
@@ -161,10 +163,17 @@ def callback():
     error = request.args.get('error')
     state = request.args.get('state')
     
+    # Log state parameters for debugging
+    logger.info(f"Callback state: {state}, Session state: {session.get('oauth_state')}")
+    
     # Verify state parameter
-    if state != session.get('oauth_state'):
-        logger.error("State parameter mismatch")
+    if not state or state != session.get('oauth_state'):
+        logger.error(f"State parameter mismatch. Received: {state}, Expected: {session.get('oauth_state')}")
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Invalid%20state%20parameter")
+    
+    # Clear the state from session after verification
+    session.pop('oauth_state', None)
+    session.modified = True
     
     if error:
         logger.error(f"Spotify auth error: {error}")
