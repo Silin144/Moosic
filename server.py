@@ -166,9 +166,10 @@ def callback():
             state = data.get('state')
             code_verifier = data.get('code_verifier')
         else:
+            # For GET requests (initial Spotify redirect), just redirect to frontend
             code = request.args.get('code')
             state = request.args.get('state')
-            code_verifier = request.args.get('code_verifier')
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?code={code}&state={state}")
         
         error = request.args.get('error')
         

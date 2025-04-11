@@ -106,69 +106,67 @@ const Auth: React.FC = () => {
     }
   }
 
-  const handleCallback = async () => {
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
     const state = params.get('state')
     const storedState = sessionStorage.getItem('state')
-    const error = params.get('error')
     
-    if (error) {
-      console.error('Spotify auth error:', error)
-      setAuthStatus('error')
-      setError(error)
-      return
-    }
-    
-    if (!code) {
-      console.error('No authorization code received')
-      setAuthStatus('error')
-      setError('No authorization code received')
-      return
-    }
-    
-    if (!state || state !== storedState) {
-      console.error('State parameter mismatch')
-      setAuthStatus('error')
-      setError('State parameter mismatch')
-      return
-    }
-    
-    // Clear state from session storage
-    sessionStorage.removeItem('state')
-    
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/callback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          code,
-          state,
-          code_verifier: localStorage.getItem('code_verifier')
-        }),
-        credentials: 'include'
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Failed to exchange code for tokens')
+    if (code && state) {
+      // Verify state
+      if (!storedState || state !== storedState) {
+        console.error('State parameter mismatch')
+        setAuthStatus('error')
+        setError('State parameter mismatch')
+        return
       }
       
-      // Redirect to success page
-      window.location.href = '/auth?auth=success'
-    } catch (error) {
-      console.error('Error during callback:', error)
-      setAuthStatus('error')
-      setError(error instanceof Error ? error.message : 'An error occurred during authentication')
-    }
-  }
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('code')) {
-      handleCallback()
+      // Clear state from session storage
+      sessionStorage.removeItem('state')
+      
+      // Get the code verifier from localStorage
+      const codeVerifier = localStorage.getItem('code_verifier')
+      if (!codeVerifier) {
+        console.error('No code verifier found')
+        setAuthStatus('error')
+        setError('No code verifier found')
+        return
+      }
+      
+      // Make the POST request to our backend
+      const exchangeCode = async () => {
+        try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/callback`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              code,
+              state,
+              code_verifier: codeVerifier
+            }),
+            credentials: 'include'
+          })
+          
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.message || 'Failed to exchange code for tokens')
+          }
+          
+          // Clear the code verifier
+          localStorage.removeItem('code_verifier')
+          
+          // Redirect to success page
+          window.location.href = '/auth?auth=success'
+        } catch (error) {
+          console.error('Error during callback:', error)
+          setAuthStatus('error')
+          setError(error instanceof Error ? error.message : 'An error occurred during authentication')
+        }
+      }
+      
+      exchangeCode()
     }
   }, [])
 
