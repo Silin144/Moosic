@@ -57,6 +57,8 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
+app.config['SESSION_COOKIE_PATH'] = '/'  # Set cookie path to root
+app.config['SESSION_COOKIE_NAME'] = 'moosic_session'  # Custom session cookie name
 
 # Initialize Flask-Session
 Session(app)
@@ -162,6 +164,10 @@ def callback():
         # Exchange code for tokens using spotipy
         token_info = sp_oauth.get_access_token(code)
         
+        if not token_info:
+            logger.error("Failed to get access token")
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20access%20token")
+        
         # Store token info in session
         session['token_info'] = {
             'access_token': token_info['access_token'],
@@ -173,6 +179,10 @@ def callback():
         sp = spotipy.Spotify(auth=token_info['access_token'])
         user_info = sp.current_user()
         
+        if not user_info:
+            logger.error("Failed to get user info")
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20user%20info")
+        
         session['user'] = {
             'id': user_info.get('id'),
             'name': user_info.get('display_name'),
@@ -183,6 +193,9 @@ def callback():
         # Force session to be saved
         session.modified = True
         
+        # Log successful authentication
+        logger.info(f"User {user_info.get('id')} authenticated successfully")
+        
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=success")
 
     except Exception as e:
@@ -191,46 +204,53 @@ def callback():
 
 @app.route('/api/check-auth')
 def check_auth():
-    if 'token_info' in session and 'user' in session:
-        # Check if token is expired
-        if time.time() > session['token_info']['expires_at']:
-            try:
-                # Refresh the token
-                token_url = 'https://accounts.spotify.com/api/token'
-                response = requests.post(
-                    token_url,
-                    data={
-                        'grant_type': 'refresh_token',
-                        'refresh_token': session['token_info']['refresh_token'],
-                        'client_id': os.environ['SPOTIFY_CLIENT_ID'],
-                        'client_secret': os.environ['SPOTIFY_CLIENT_SECRET']
-                    },
-                    headers={
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    }
-                )
-                
-                if response.status_code == 200:
-                    token_data = response.json()
-                    session['token_info'] = {
-                        'access_token': token_data['access_token'],
-                        'refresh_token': session['token_info']['refresh_token'],  # Keep the same refresh token
-                        'expires_at': int(time.time()) + token_data['expires_in']
-                    }
-                    session.modified = True
-                else:
+    try:
+        if 'token_info' in session and 'user' in session:
+            # Check if token is expired
+            if time.time() > session['token_info']['expires_at']:
+                try:
+                    # Refresh the token
+                    token_url = 'https://accounts.spotify.com/api/token'
+                    response = requests.post(
+                        token_url,
+                        data={
+                            'grant_type': 'refresh_token',
+                            'refresh_token': session['token_info']['refresh_token'],
+                            'client_id': os.environ['SPOTIFY_CLIENT_ID'],
+                            'client_secret': os.environ['SPOTIFY_CLIENT_SECRET']
+                        },
+                        headers={
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        }
+                    )
+                    
+                    if response.status_code == 200:
+                        token_data = response.json()
+                        session['token_info'] = {
+                            'access_token': token_data['access_token'],
+                            'refresh_token': session['token_info']['refresh_token'],  # Keep the same refresh token
+                            'expires_at': int(time.time()) + token_data['expires_in']
+                        }
+                        session.modified = True
+                    else:
+                        logger.error(f"Token refresh failed: {response.status_code} - {response.text}")
+                        session.clear()
+                        return jsonify({"authenticated": False})
+                except Exception as e:
+                    logger.error(f"Error refreshing token: {str(e)}")
                     session.clear()
                     return jsonify({"authenticated": False})
-            except Exception as e:
-                logger.error(f"Error refreshing token: {str(e)}")
-                session.clear()
-                return jsonify({"authenticated": False})
+            
+            return jsonify({
+                "authenticated": True,
+                "user": session['user']
+            })
         
-        return jsonify({
-            "authenticated": True,
-            "user": session['user']
-        })
-    return jsonify({"authenticated": False})
+        logger.warning("No valid session found")
+        return jsonify({"authenticated": False})
+    except Exception as e:
+        logger.error(f"Error in check-auth: {str(e)}")
+        return jsonify({"authenticated": False})
 
 @app.route('/api/logout')
 def logout():
