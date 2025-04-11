@@ -28,6 +28,7 @@ const Auth: React.FC = () => {
     const checkAuth = async () => {
       try {
         setAuthStatus('checking')
+        console.log('Checking authentication status...')
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/check-auth`, {
           credentials: 'include',
           headers: {
@@ -37,16 +38,20 @@ const Auth: React.FC = () => {
         })
         
         if (!response.ok) {
+          console.error('Auth check failed with status:', response.status)
           throw new Error('Failed to check authentication status')
         }
         
         const data = await response.json()
+        console.log('Auth check response:', data)
         
         if (data.authenticated) {
+          console.log('User is authenticated, redirecting to home')
           setIsAuthenticated(true)
           setAuthStatus('authenticated')
           navigate('/')
         } else {
+          console.log('User is not authenticated, reason:', data.reason)
           setAuthStatus('idle')
         }
       } catch (err) {
@@ -63,6 +68,9 @@ const Auth: React.FC = () => {
     } else if (params.get('auth') === 'error') {
       setAuthStatus('error')
       setError(params.get('message') || 'Authentication failed')
+    } else if (params.get('code')) {
+      // If we have a code but no auth status, we're in the callback flow
+      console.log('Code parameter found in URL, handling callback...')
     } else {
       checkAuth()
     }

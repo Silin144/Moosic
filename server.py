@@ -59,13 +59,19 @@ logger = logging.getLogger(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_DOMAIN'] = None
-app.config['PERMANENT_SESSION_LIFETIME'] = 3600
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400
 app.config['SESSION_COOKIE_PATH'] = '/'
 app.config['SESSION_COOKIE_NAME'] = 'moosic_session'
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True
-app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'  # Add this line for filesystem session storage
+app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
+app.config['SESSION_USE_SIGNER'] = True
+
+# Make sessions permanent by default
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
 
 # Initialize Flask-Session
 Session(app)
@@ -93,6 +99,12 @@ def after_request(response):
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie')
         response.headers.add('Access-Control-Max-Age', '3600')
+    
+    # Ensure the session is saved
+    if not request.cookies.get(app.config['SESSION_COOKIE_NAME']) and 'token_info' in session:
+        logger.info("Session cookie not present in request. Forcing session save.")
+        session.modified = True
+        
     return response
 
 # Configure for environment
@@ -114,6 +126,8 @@ def get_spotify_client():
     token_info = session.get('token_info', None)
     
     if not token_info:
+        logger.error('No token found in session')
+        logger.info(f"Available session keys: {list(session.keys())}")
         raise Exception('No token found in session')
     
     # Check if token is expired
@@ -123,12 +137,37 @@ def get_spotify_client():
     if is_expired:
         try:
             logger.info('Token expired, refreshing...')
-            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+            # Directly use requests instead of spotipy for token refresh
+            refresh_token = token_info['refresh_token']
+            token_url = 'https://accounts.spotify.com/api/token'
+            response = requests.post(
+                token_url,
+                data={
+                    'grant_type': 'refresh_token',
+                    'refresh_token': refresh_token,
+                    'client_id': os.environ['SPOTIFY_CLIENT_ID'],
+                    'client_secret': os.environ['SPOTIFY_CLIENT_SECRET']
+                },
+                headers={
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Error refreshing token: {response.status_code} - {response.text}")
+                raise Exception('Failed to refresh token')
+                
+            new_token_info = response.json()
+            token_info = {
+                'access_token': new_token_info['access_token'],
+                'refresh_token': refresh_token,  # Keep the existing refresh token if not provided
+                'expires_at': int(time.time()) + new_token_info['expires_in']
+            }
             session['token_info'] = token_info
             session.modified = True
+            logger.info('Token refreshed successfully')
         except Exception as e:
             logger.error(f"Error refreshing token: {str(e)}")
-            session.clear()
             raise Exception('Failed to refresh token')
     
     return spotipy.Spotify(auth=token_info['access_token'])
@@ -321,9 +360,14 @@ def callback():
 def check_auth():
     try:
         logger.info(f"Checking auth, session keys: {list(session.keys())}")
+        logger.info(f"Session cookie name: {app.config['SESSION_COOKIE_NAME']}")
+        logger.info(f"Session ID: {session.sid if hasattr(session, 'sid') else 'No session ID'}")
+        
         if 'token_info' in session and 'user' in session:
+            logger.info("Found token_info and user in session")
             # Check if token is expired
             if time.time() > session['token_info']['expires_at']:
+                logger.info("Token is expired, attempting to refresh")
                 try:
                     # Refresh the token
                     token_url = 'https://accounts.spotify.com/api/token'
@@ -348,25 +392,27 @@ def check_auth():
                             'expires_at': int(time.time()) + token_data['expires_in']
                         }
                         session.modified = True
+                        logger.info("Successfully refreshed token")
                     else:
                         logger.error(f"Token refresh failed: {response.status_code} - {response.text}")
                         session.clear()
-                        return jsonify({"authenticated": False})
+                        return jsonify({"authenticated": False, "reason": "token_refresh_failed"})
                 except Exception as e:
                     logger.error(f"Error refreshing token: {str(e)}")
                     session.clear()
-                    return jsonify({"authenticated": False})
+                    return jsonify({"authenticated": False, "reason": "token_refresh_error"})
             
+            logger.info(f"Returning authenticated=True with user {session['user'].get('id')}")
             return jsonify({
                 "authenticated": True,
                 "user": session['user']
             })
         
         logger.warning(f"No valid session found. Session keys: {list(session.keys())}")
-        return jsonify({"authenticated": False})
+        return jsonify({"authenticated": False, "reason": "no_valid_session"})
     except Exception as e:
         logger.error(f"Error in check-auth: {str(e)}")
-        return jsonify({"authenticated": False})
+        return jsonify({"authenticated": False, "reason": "general_error", "error": str(e)})
 
 @app.route('/api/logout')
 def logout():
@@ -484,18 +530,28 @@ def create_playlist():
 def generate_playlist():
     try:
         # Check authentication
+        logger.info(f"Generate playlist request received. Session keys: {list(session.keys())}")
         if 'token_info' not in session or 'user' not in session:
+            logger.error("User not authenticated - missing session data")
             return jsonify({"error": "User not authenticated"}), 401
 
         data = request.json
         playlist_description = data.get('description', '')
         
         if not playlist_description:
+            logger.error("Missing playlist description")
             return jsonify({"error": "Playlist description is required"}), 400
+        
+        logger.info(f"Generating playlist with description: {playlist_description[:50]}...")
 
         # Get Spotify client with valid token
-        sp = get_spotify_client()
-        
+        try:
+            sp = get_spotify_client()
+            logger.info("Successfully created Spotify client")
+        except Exception as e:
+            logger.error(f"Failed to create Spotify client: {str(e)}")
+            return jsonify({"error": "Authentication error", "details": str(e)}), 401
+
         # Generate song suggestions using OpenAI
         try:
             prompt = f"Generate a list of 10 songs for this playlist idea:\n{playlist_description}\n\nFormat each song as 'Song Name by Artist'"
