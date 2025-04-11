@@ -157,9 +157,16 @@ def login():
         logger.error(f"Error in login route: {str(e)}")
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20initialize%20login")
 
-@app.route('/api/callback')
+@app.route('/api/callback', methods=['GET', 'POST'])
 def callback():
-    code = request.args.get('code')
+    if request.method == 'POST':
+        data = request.get_json()
+        code = data.get('code')
+        code_verifier = data.get('code_verifier')
+    else:
+        code = request.args.get('code')
+        code_verifier = request.args.get('code_verifier')
+    
     error = request.args.get('error')
     
     if error:
@@ -170,13 +177,11 @@ def callback():
         logger.error("No authorization code received")
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20authorization%20code%20received")
 
-    try:
-        # Get code verifier from frontend
-        code_verifier = request.args.get('code_verifier')
-        if not code_verifier:
-            logger.error("No code verifier provided")
-            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20code%20verifier%20provided")
+    if not code_verifier:
+        logger.error("No code verifier provided")
+        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20code%20verifier%20provided")
 
+    try:
         # Exchange code for tokens using spotipy with PKCE
         token_info = sp_oauth.get_access_token(
             code,
@@ -217,10 +222,14 @@ def callback():
         # Log successful authentication
         logger.info(f"User {user_info.get('id')} authenticated successfully")
         
+        if request.method == 'POST':
+            return jsonify({"status": "success"})
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=success")
 
     except Exception as e:
         logger.error(f"Error in callback: {str(e)}")
+        if request.method == 'POST':
+            return jsonify({"status": "error", "message": str(e)}), 400
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=An%20error%20occurred%20during%20authentication")
 
 @app.route('/api/check-auth')

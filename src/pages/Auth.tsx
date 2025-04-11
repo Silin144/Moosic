@@ -124,11 +124,29 @@ const Auth: React.FC = () => {
           if (!codeVerifier) {
             throw new Error('No code verifier found')
           }
-          
-          // Add code verifier to the callback URL
-          const callbackUrl = new URL(window.location.href)
-          callbackUrl.searchParams.set('code_verifier', codeVerifier)
-          window.location.href = callbackUrl.toString()
+
+          // Make a POST request to the backend with the code and verifier
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/callback`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              code,
+              code_verifier: codeVerifier
+            }),
+            credentials: 'include'
+          })
+
+          if (!response.ok) {
+            throw new Error('Failed to exchange code for token')
+          }
+
+          // Clear the code verifier from localStorage
+          localStorage.removeItem('code_verifier')
+
+          // Redirect to success page
+          window.location.href = `${window.location.origin}/auth?auth=success`
         } catch (err) {
           console.error('Callback error:', err)
           setAuthStatus('error')
