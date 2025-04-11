@@ -159,34 +159,51 @@ def login():
 
 @app.route('/api/callback', methods=['GET', 'POST'])
 def callback():
-    if request.method == 'POST':
-        data = request.get_json()
-        code = data.get('code')
-        state = data.get('state')
-    else:
-        code = request.args.get('code')
-        state = request.args.get('state')
-    
-    error = request.args.get('error')
-    
-    if error:
-        logger.error(f"Spotify auth error: {error}")
-        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message={error}")
-    
-    if not code:
-        logger.error("No authorization code received")
-        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20authorization%20code%20received")
-
     try:
-        # Exchange code for tokens using spotipy
-        token_info = sp_oauth.get_access_token(
-            code,
-            as_dict=False,
-            check_cache=False
-        )
+        if request.method == 'POST':
+            data = request.get_json()
+            code = data.get('code')
+            state = data.get('state')
+            code_verifier = data.get('code_verifier')
+        else:
+            code = request.args.get('code')
+            state = request.args.get('state')
+            code_verifier = request.args.get('code_verifier')
+        
+        error = request.args.get('error')
+        
+        if error:
+            logger.error(f"Spotify auth error: {error}")
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message={error}")
+        
+        if not code:
+            logger.error("No authorization code received")
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20authorization%20code%20received")
+
+        if not code_verifier:
+            logger.error("No code verifier received")
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=No%20code%20verifier%20received")
+
+        # Log the received code and state for debugging
+        logger.info(f"Received code: {code[:10]}...")
+        logger.info(f"Received state: {state}")
+        logger.info(f"Received code_verifier: {code_verifier[:10]}...")
+
+        # Exchange code for tokens using spotipy with PKCE
+        try:
+            token_info = sp_oauth.get_access_token(
+                code,
+                as_dict=False,
+                check_cache=False,
+                code_verifier=code_verifier
+            )
+            logger.info("Successfully obtained token info")
+        except Exception as e:
+            logger.error(f"Error getting access token: {str(e)}")
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20access%20token")
         
         if not token_info:
-            logger.error("Failed to get access token")
+            logger.error("Token info is None")
             return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20access%20token")
         
         # Store token info in session
@@ -197,11 +214,16 @@ def callback():
         }
         
         # Get user info using spotipy
-        sp = spotipy.Spotify(auth=token_info['access_token'])
-        user_info = sp.current_user()
+        try:
+            sp = spotipy.Spotify(auth=token_info['access_token'])
+            user_info = sp.current_user()
+            logger.info(f"Successfully obtained user info for user: {user_info.get('id')}")
+        except Exception as e:
+            logger.error(f"Error getting user info: {str(e)}")
+            return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20user%20info")
         
         if not user_info:
-            logger.error("Failed to get user info")
+            logger.error("User info is None")
             return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Failed%20to%20get%20user%20info")
         
         session['user'] = {
@@ -222,7 +244,7 @@ def callback():
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=success")
 
     except Exception as e:
-        logger.error(f"Error in callback: {str(e)}")
+        logger.error(f"Unexpected error in callback: {str(e)}")
         if request.method == 'POST':
             return jsonify({"status": "error", "message": str(e)}), 400
         return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=An%20error%20occurred%20during%20authentication")

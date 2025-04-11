@@ -17,12 +17,6 @@ const base64encode = (input: ArrayBuffer) => {
     .replace(/\//g, '_')
 }
 
-const sha256 = async (plain: string) => {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(plain)
-  return window.crypto.subtle.digest('SHA-256', data)
-}
-
 const Auth: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -65,7 +59,7 @@ const Auth: React.FC = () => {
     // Check URL parameters for auth response
     const params = new URLSearchParams(location.search)
     if (params.get('auth') === 'success') {
-      checkAuth() // Re-check auth status after successful redirect
+      checkAuth()
     } else if (params.get('auth') === 'error') {
       setAuthStatus('error')
       setError(params.get('message') || 'Authentication failed')
@@ -75,21 +69,26 @@ const Auth: React.FC = () => {
   }, [location, navigate, setIsAuthenticated])
 
   const handleLogin = async () => {
-    // Clear any existing session data
-    localStorage.removeItem('code_verifier');
-    sessionStorage.removeItem('state');
-    
-    // Generate state parameter
-    const state = generateRandomString(16);
-    sessionStorage.setItem('state', state);
-    
-    // Generate PKCE code verifier and challenge
-    const codeVerifier = generateRandomString(128);
-    const codeChallenge = base64encode(await sha256(codeVerifier));
-    localStorage.setItem('code_verifier', codeVerifier);
-    
-    // Build authorization URL
-    const params = new URLSearchParams({
+    try {
+      // Clear any existing session data
+      localStorage.removeItem('code_verifier')
+      sessionStorage.removeItem('state')
+      
+      // Generate PKCE code verifier and challenge
+      const codeVerifier = generateRandomString(128)
+      const data = new TextEncoder().encode(codeVerifier)
+      const hashed = await crypto.subtle.digest('SHA-256', data)
+      const codeChallenge = base64encode(hashed)
+      
+      // Store code verifier in localStorage
+      localStorage.setItem('code_verifier', codeVerifier)
+      
+      // Generate state parameter
+      const state = generateRandomString(16)
+      sessionStorage.setItem('state', state)
+      
+      // Build authorization URL
+      const params = new URLSearchParams({
         client_id: import.meta.env.VITE_SPOTIFY_CLIENT_ID || '',
         response_type: 'code',
         redirect_uri: import.meta.env.VITE_SPOTIFY_REDIRECT_URI || '',
@@ -97,54 +96,81 @@ const Auth: React.FC = () => {
         code_challenge_method: 'S256',
         code_challenge: codeChallenge,
         scope: 'playlist-modify-public playlist-modify-private user-read-private user-read-email'
-    });
-    
-    window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
-  };
+      })
+      
+      window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`
+    } catch (err) {
+      console.error('Login error:', err)
+      setAuthStatus('error')
+      setError('Failed to initialize login')
+    }
+  }
 
   const handleCallback = async () => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    const state = params.get('state');
-    const storedState = sessionStorage.getItem('state');
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    const state = params.get('state')
+    const storedState = sessionStorage.getItem('state')
+    const error = params.get('error')
+    
+    if (error) {
+      console.error('Spotify auth error:', error)
+      setAuthStatus('error')
+      setError(error)
+      return
+    }
     
     if (!code) {
-        console.error('No authorization code received');
-        return;
+      console.error('No authorization code received')
+      setAuthStatus('error')
+      setError('No authorization code received')
+      return
     }
     
     if (!state || state !== storedState) {
-        console.error('State parameter mismatch');
-        return;
+      console.error('State parameter mismatch')
+      setAuthStatus('error')
+      setError('State parameter mismatch')
+      return
     }
     
     // Clear state from session storage
-    sessionStorage.removeItem('state');
+    sessionStorage.removeItem('state')
     
     try {
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/callback`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                code,
-                state
-            }),
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to exchange code for tokens');
-        }
-        
-        // Redirect to success page
-        window.location.href = '/auth?auth=success';
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/callback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code,
+          state,
+          code_verifier: localStorage.getItem('code_verifier')
+        }),
+        credentials: 'include'
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Failed to exchange code for tokens')
+      }
+      
+      // Redirect to success page
+      window.location.href = '/auth?auth=success'
     } catch (error) {
-        console.error('Error during callback:', error);
-        window.location.href = '/auth?auth=error';
+      console.error('Error during callback:', error)
+      setAuthStatus('error')
+      setError(error instanceof Error ? error.message : 'An error occurred during authentication')
     }
-  };
+  }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('code')) {
+      handleCallback()
+    }
+  }, [])
 
   if (authStatus === 'checking') {
     return (
