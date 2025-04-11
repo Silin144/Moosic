@@ -85,12 +85,19 @@ const Auth: React.FC = () => {
         document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
       })
 
-      // Redirect to login endpoint with PKCE parameters
-      const loginUrl = new URL(`${import.meta.env.VITE_API_URL}/api/login`)
-      loginUrl.searchParams.append('code_challenge', codeChallenge)
-      loginUrl.searchParams.append('code_challenge_method', 'S256')
+      // Redirect to Spotify authorization endpoint
+      const authUrl = new URL('https://accounts.spotify.com/authorize')
+      const params = {
+        client_id: import.meta.env.VITE_SPOTIFY_CLIENT_ID,
+        response_type: 'code',
+        redirect_uri: import.meta.env.VITE_SPOTIFY_REDIRECT_URI,
+        scope: 'playlist-modify-public playlist-modify-private user-read-private user-read-email',
+        code_challenge_method: 'S256',
+        code_challenge: codeChallenge,
+      }
       
-      window.location.href = loginUrl.toString()
+      authUrl.search = new URLSearchParams(params).toString()
+      window.location.href = authUrl.toString()
     } catch (err) {
       console.error('Login error:', err)
       setAuthStatus('error')

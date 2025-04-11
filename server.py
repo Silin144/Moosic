@@ -161,19 +161,6 @@ def login():
 def callback():
     code = request.args.get('code')
     error = request.args.get('error')
-    state = request.args.get('state')
-    
-    # Log state parameters for debugging
-    logger.info(f"Callback state: {state}, Session state: {session.get('oauth_state')}")
-    
-    # Verify state parameter
-    if not state or state != session.get('oauth_state'):
-        logger.error(f"State parameter mismatch. Received: {state}, Expected: {session.get('oauth_state')}")
-        return redirect(f"{os.environ['FRONTEND_URL']}/auth?auth=error&message=Invalid%20state%20parameter")
-    
-    # Clear the state from session after verification
-    session.pop('oauth_state', None)
-    session.modified = True
     
     if error:
         logger.error(f"Spotify auth error: {error}")
