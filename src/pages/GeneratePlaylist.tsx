@@ -688,10 +688,11 @@ const GeneratePlaylist: React.FC = () => {
                     {topTracksError}
                   </Alert>
                 ) : (
-                  <Grid container spacing={3}>
+                  <Grid container spacing={3} component="div">
                     {topTracks.slice(0, 8).map((track, index) => (
                       <Grid 
                         key={track.id}
+                        component="div"
                         size={{ xs: 12, sm: 6, md: 3 }}
                       >
                         <motion.div
@@ -973,13 +974,12 @@ const GeneratePlaylist: React.FC = () => {
                     Playlist Songs ({playlistPreview.tracks.length})
                   </Typography>
                   
-                  <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid container spacing={2} sx={{ mt: 1 }} component="div">
                     {playlistPreview.tracks.slice(0, 8).map((track, index) => (
                       <Grid 
-                        item
-                        xs={12}
-                        sm={6}
                         key={index}
+                        component="div"
+                        size={{ xs: 12, sm: 6 }}
                       >
                         <Card 
                           sx={{ 

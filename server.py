@@ -747,9 +747,19 @@ Prioritize well-known, mainstream songs that are likely available on Spotify.
 """
             
             # Create the user prompt
+            artists_text = f"Some artists you might consider: {', '.join(top_artist_names[:5])}. " if top_artist_names else ""
+            genres_text = f"Some genres to consider: {', '.join(top_artist_genres[:5])}. " if top_artist_genres else ""
+            tracks_text = f"Some tracks to consider: {', '.join(top_track_ids[:5])}. " if top_track_ids else ""
+            personality_text = ""
+            if personalization:
+                personality_text = f"{personalization}\n\n"
+            
             user_prompt = f"""
-            I need you to create a playlist with at least 75 songs based on this request: "{prompt}".
-            {personalization}
+            I need you to create a playlist with at least 75 songs based on this request: "{playlist_description}".
+            {artists_text}
+            {genres_text}
+            {tracks_text}
+            {personality_text}
             Do not include any explanations - only respond with a list of real songs in the format "Song Name by Artist Name", one per line.
             """
             
