@@ -807,15 +807,16 @@ const GeneratePlaylist: React.FC = () => {
               elevation={3} 
               sx={{ 
                 p: { xs: 3, md: 4 }, 
-                background: '#fff',
+                background: 'rgba(15, 24, 16, 0.9)',
                 borderRadius: '12px',
-                border: '1px solid #eee',
+                border: '1px solid rgba(29, 185, 84, 0.2)',
                 maxWidth: '700px',
                 mx: 'auto',
                 mb: 4,
                 position: 'relative',
                 overflow: 'hidden',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.05)'
+                boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+                color: 'rgba(255, 255, 255, 0.9)'
               }}
             >
               <Box sx={{ position: 'relative', zIndex: 1 }}>
@@ -823,7 +824,7 @@ const GeneratePlaylist: React.FC = () => {
                   variant="h5" 
                   fontWeight="bold" 
                   gutterBottom
-                  sx={{ mb: 3 }}
+                  sx={{ mb: 3, color: 'rgba(255, 255, 255, 0.95)' }}
                 >
                   Create Your Playlist
                 </Typography>
@@ -840,7 +841,30 @@ const GeneratePlaylist: React.FC = () => {
                   sx={{
                     mb: 3,
                     '& .MuiOutlinedInput-root': {
-                      borderRadius: '8px'
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(15, 24, 16, 0.7)',
+                      border: 'none',
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#1DB954',
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#1DB954',
+                        borderWidth: 2
+                      },
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(29, 185, 84, 0.5)'
+                      }
+                    },
+                    '& .MuiInputLabel-outlined': {
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      '&.Mui-focused': {
+                        color: '#1DB954'
+                      }
+                    },
+                    '& .MuiInputBase-input::placeholder': {
+                      color: 'rgba(255, 255, 255, 0.5)',
+                      opacity: 1
                     }
                   }}
                 />
@@ -881,12 +905,13 @@ const GeneratePlaylist: React.FC = () => {
                     elevation={0} 
                     sx={{ 
                       p: 2, 
-                      background: '#f9f9f9',
+                      background: 'rgba(29, 185, 84, 0.1)',
                       borderRadius: '8px',
-                      mt: 3
+                      mt: 3,
+                      border: '1px solid rgba(29, 185, 84, 0.2)'
                     }}
                   >
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    <Typography variant="subtitle2" color="rgba(255, 255, 255, 0.8)" gutterBottom>
                       Try something like:
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -894,16 +919,31 @@ const GeneratePlaylist: React.FC = () => {
                         label="2010s summer hits" 
                         size="small"
                         onClick={() => setDescription("2010s summer hits that were popular at beach parties")}
+                        sx={{ 
+                          backgroundColor: 'rgba(29, 185, 84, 0.2)', 
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          '&:hover': { backgroundColor: 'rgba(29, 185, 84, 0.3)' } 
+                        }}
                       />
                       <Chip 
                         label="90s R&B classics" 
                         size="small"
                         onClick={() => setDescription("Classic 90s R&B songs that defined the era")}
+                        sx={{ 
+                          backgroundColor: 'rgba(29, 185, 84, 0.2)', 
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          '&:hover': { backgroundColor: 'rgba(29, 185, 84, 0.3)' } 
+                        }}
                       />
                       <Chip 
                         label="Indie folk for rainy days" 
                         size="small"
                         onClick={() => setDescription("Calming indie folk songs perfect for rainy days with a cup of coffee")}
+                        sx={{ 
+                          backgroundColor: 'rgba(29, 185, 84, 0.2)', 
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          '&:hover': { backgroundColor: 'rgba(29, 185, 84, 0.3)' } 
+                        }}
                       />
                     </Box>
                   </Paper>
