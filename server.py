@@ -720,12 +720,43 @@ def generate_playlist():
             
             # Build a more personalized prompt using the user's top artists and genres
             personalization = ""
-            if top_artist_names or top_artist_genres:
+            
+            # Check if this is a request for objective "top songs" or a specific year
+            is_objective_request = False
+            objective_patterns = [
+                r'top songs',
+                r'best songs',
+                r'popular songs',
+                r'hit songs',
+                r'billboard',
+                r'chart',
+                r'most played'
+            ]
+            
+            # Check if request is for objective top songs
+            for pattern in objective_patterns:
+                if pattern in playlist_description.lower():
+                    is_objective_request = True
+                    logger.info(f"Detected objective request pattern: '{pattern}'")
+                    break
+                    
+            # Also check if request is specifically for a year (e.g. "2016 songs")
+            year_pattern = r'\b(19|20)\d{2}\b'
+            if re.search(year_pattern, playlist_description.lower()):
+                is_objective_request = True
+                year_match = re.search(year_pattern, playlist_description.lower()).group(0)
+                logger.info(f"Detected year in request: {year_match}")
+            
+            # Only add personalization if this is not an objective request
+            if not is_objective_request and (top_artist_names or top_artist_genres):
                 personalization = "\n\n## USER PROFILE:"
                 if top_artist_names:
                     personalization += f"\n- Favorite Artists: {', '.join(top_artist_names[:5])}"
                 if top_artist_genres:
                     personalization += f"\n- Preferred Genres: {', '.join(top_artist_genres[:5])}"
+                logger.info("Adding personalization based on user preferences")
+            else:
+                logger.info("Skipping personalization for objective request")
             
             # Extract key aspects from the playlist description
             prompt_analysis = f"""
@@ -741,10 +772,13 @@ def generate_playlist():
 4. Note any activity contexts (e.g., "workout", "studying", "road trip")
 5. Identify any specific artist influences mentioned
 6. Check if the request mentions specific songs to use as references (e.g., "songs like Shape of You")
+7. Determine if this is a request for objective popularity (e.g., "top songs of 2016", "best hits from 90s")
 
 ## RESPONSE STRATEGY:
 - If the request mentions "songs like [song title]", focus on providing songs with similar style, tempo, mood, and from similar artists or genres.
 - For any reference songs mentioned, try to identify their key characteristics (genre, mood, era) and use those to guide your selections.
+- If the request is for "top songs" or "best songs" from a specific year or era, prioritize the most globally popular and commercially successful songs from that period, NOT niche or regional songs. Focus on mainstream global hits.
+- When a specific year is mentioned (e.g., "2016 songs"), provide the most popular international/global hits from that year based on charts like Billboard, not regional preferences.
 
 ## THEN, GENERATE SONG SELECTIONS:
 Based on your analysis, provide EXACTLY 25 highly relevant songs that precisely match the request. Focus on quality, variety, and accuracy.
@@ -752,19 +786,24 @@ Prioritize well-known, mainstream songs that are likely available on Spotify.
 """
             
             # Create the user prompt
-            artists_text = f"Some artists you might consider: {', '.join(top_artist_names[:5])}. " if top_artist_names else ""
-            genres_text = f"Some genres to consider: {', '.join(top_artist_genres[:5])}. " if top_artist_genres else ""
-            tracks_text = f"Some tracks to consider: {', '.join(top_track_ids[:5])}. " if top_track_ids else ""
-            personality_text = ""
-            if personalization:
-                personality_text = f"{personalization}\n\n"
+            artists_text = f"Some artists you might consider: {', '.join(top_artist_names[:5])}. " if top_artist_names and not is_objective_request else ""
+            genres_text = f"Some genres to consider: {', '.join(top_artist_genres[:5])}. " if top_artist_genres and not is_objective_request else ""
+            tracks_text = f"Some tracks to consider: {', '.join(top_track_ids[:5])}. " if top_track_ids and not is_objective_request else ""
+            
+            # Add special instructions for objective requests
+            objective_instruction = ""
+            if is_objective_request:
+                objective_instruction = """
+                Focus on globally popular and commercially successful songs, not regional hits.
+                For year-specific requests, provide the biggest international chart hits from that year.
+                """
             
             user_prompt = f"""
             I need you to create a playlist with at least 25 songs based on this request: "{playlist_description}".
             {artists_text}
             {genres_text}
             {tracks_text}
-            {personality_text}
+            {objective_instruction}
             Do not include any explanations - only respond with a list of real songs in the format "Song Name by Artist Name", one per line.
             """
             
@@ -1365,14 +1404,40 @@ def generate_song_suggestions(
     try:
         logger.info(f"Generating song suggestions for prompt: {prompt}")
         
-        # Format seed information
-        artists_text = f"Some artists you might consider: {', '.join(seed_artists)}. " if seed_artists else ""
-        genres_text = f"Some genres to consider: {', '.join(seed_genres)}. " if seed_genres else ""
-        tracks_text = f"Some tracks to consider: {', '.join(seed_tracks)}. " if seed_tracks else ""
+        # Check if this is a request for objective "top songs" or a specific year
+        is_objective_request = False
+        objective_patterns = [
+            r'top songs',
+            r'best songs',
+            r'popular songs',
+            r'hit songs',
+            r'billboard',
+            r'chart',
+            r'most played'
+        ]
         
-        # Add personality analysis if available
+        # Check if request is for objective top songs
+        for pattern in objective_patterns:
+            if pattern in prompt.lower():
+                is_objective_request = True
+                logger.info(f"Detected objective request pattern: '{pattern}'")
+                break
+                
+        # Also check if request is specifically for a year (e.g. "2016 songs")
+        year_pattern = r'\b(19|20)\d{2}\b'
+        if re.search(year_pattern, prompt.lower()):
+            is_objective_request = True
+            year_match = re.search(year_pattern, prompt.lower()).group(0)
+            logger.info(f"Detected year in request: {year_match}")
+        
+        # Format seed information - only if not an objective request
+        artists_text = f"Some artists you might consider: {', '.join(seed_artists)}. " if seed_artists and not is_objective_request else ""
+        genres_text = f"Some genres to consider: {', '.join(seed_genres)}. " if seed_genres and not is_objective_request else ""
+        tracks_text = f"Some tracks to consider: {', '.join(seed_tracks)}. " if seed_tracks and not is_objective_request else ""
+        
+        # Add personality analysis if available and not an objective request
         personality_text = ""
-        if analysis and isinstance(analysis, dict):
+        if not is_objective_request and analysis and isinstance(analysis, dict):
             traits = []
             for category, score in analysis.items():
                 if score > 0.7:  # High score
@@ -1382,12 +1447,25 @@ def generate_song_suggestions(
             
             if traits:
                 personality_text = f"Consider that the user's personality analysis shows: {', '.join(traits)}. "
-            
+        
+        # Add special instructions for objective requests
+        objective_instruction = ""
+        if is_objective_request:
+            objective_instruction = """
+            Focus on globally popular and commercially successful songs, not regional hits.
+            For year-specific requests, provide the biggest international chart hits from that year.
+            """
+        
         # Create a detailed system prompt
         system_prompt = """
         You are a music expert. Return a list of 25 songs matching the user's request.
         Format each song as: "Song Name by Artist Name"
         Only include real songs. No explanations or additional text.
+        
+        When handling requests about "top songs" from a specific year or era:
+        - Focus on globally popular mainstream hits, not regional or niche songs
+        - Use Billboard, Rolling Stone, and other mainstream charts as reference
+        - For year-specific requests (e.g., "2016 songs"), provide internationally recognized hits
         """
         
         # Create the user prompt
@@ -1397,6 +1475,7 @@ def generate_song_suggestions(
         {genres_text}
         {tracks_text}
         {personality_text}
+        {objective_instruction}
         Do not include any explanations - only respond with a list of real songs in the format "Song Name by Artist Name", one per line.
         """
         

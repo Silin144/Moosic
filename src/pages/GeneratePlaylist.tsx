@@ -25,7 +25,8 @@ import {
   alpha,
   Link,
   Badge,
-  useMediaQuery
+  useMediaQuery,
+  Dialog
 } from '@mui/material'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
@@ -110,6 +111,14 @@ const GeneratePlaylist: React.FC = () => {
   const [showTips, setShowTips] = useState<boolean>(true)
   const [playlistHistory, setPlaylistHistory] = useState<PlaylistHistory[]>([])
   const [showHistory, setShowHistory] = useState<boolean>(false)
+  const [currentLoadingMessage, setCurrentLoadingMessage] = useState(0)
+  const loadingMessages = [
+    "Discovering the perfect songs for you...",
+    "Mixing your green playlist vibes...",
+    "Finding those hidden musical gems...",
+    "Curating tracks that match your description...",
+    "Almost there, finalizing your playlist..."
+  ]
 
   // Check auth status only once when component mounts
   React.useEffect(() => {
@@ -195,6 +204,16 @@ const GeneratePlaylist: React.FC = () => {
       }
     }
   }, [])
+
+  // Cycle through loading messages
+  useEffect(() => {
+    if (loading) {
+      const interval = setInterval(() => {
+        setCurrentLoadingMessage((prev) => (prev + 1) % loadingMessages.length);
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [loading, loadingMessages.length]);
 
   // Save prompt to localStorage
   const handleSavePrompt = (prompt: string) => {
@@ -381,6 +400,58 @@ const GeneratePlaylist: React.FC = () => {
 
   return (
     <>
+      {/* Loading Dialog */}
+      <Dialog 
+        open={loading} 
+        fullWidth 
+        maxWidth="xs"
+        PaperProps={{
+          sx: {
+            backgroundColor: 'rgba(21, 40, 21, 0.95)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 3,
+            border: '1px solid rgba(29, 185, 84, 0.2)'
+          }
+        }}
+      >
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Box sx={{ position: 'relative', height: 100, width: 100, mx: 'auto', mb: 3 }}>
+            <CircularProgress 
+              size={100}
+              thickness={2}
+              sx={{ 
+                color: '#1DB954',
+                position: 'absolute',
+                top: 0,
+                left: 0
+              }}
+            />
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                bottom: 0,
+                right: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <MusicNoteIcon sx={{ fontSize: 40, color: '#1DB954' }} />
+            </Box>
+          </Box>
+          
+          <Typography variant="h6" gutterBottom sx={{ color: 'rgba(255, 255, 255, 0.95)' }}>
+            Creating Your Perfect Playlist
+          </Typography>
+          
+          <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+            {loadingMessages[currentLoadingMessage]}
+          </Typography>
+        </Box>
+      </Dialog>
+
       <Container maxWidth="xl" sx={{ 
         py: 6,
         position: 'relative',
@@ -392,7 +463,7 @@ const GeneratePlaylist: React.FC = () => {
           right: 0,
           bottom: 0,
           left: 0,
-          background: 'linear-gradient(135deg, rgba(29,185,84,0.08) 0%, rgba(30,215,96,0.03) 100%)',
+          background: 'radial-gradient(circle at 70% 30%, #152815 0%, #0A1F0A 100%)',
           zIndex: -1,
         }
       }}>
@@ -400,13 +471,14 @@ const GeneratePlaylist: React.FC = () => {
           mb: 6, 
           position: 'relative',
           textAlign: 'center',
-          background: 'linear-gradient(135deg, rgba(29,185,84,0.3) 0%, rgba(30,215,96,0.1) 100%)',
+          background: 'linear-gradient(135deg, rgba(29,185,84,0.15) 0%, rgba(30,215,96,0.05) 100%)',
           p: { xs: 3, md: 4 },
           pt: { xs: 6, md: 8 },
           pb: { xs: 8, md: 10 },
           borderRadius: '20px',
           overflow: 'hidden',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+          border: '1px solid rgba(29,185,84,0.1)'
         }}>
           {/* Animated background elements */}
           <Box sx={{ 
@@ -417,7 +489,7 @@ const GeneratePlaylist: React.FC = () => {
             height: '120%', 
             zIndex: -1,
             opacity: 0.6,
-            background: 'radial-gradient(circle at 30% 30%, rgba(29,185,84,0.4) 0%, transparent 25%), radial-gradient(circle at 70% 70%, rgba(30,215,96,0.3) 0%, transparent 25%)'
+            background: 'radial-gradient(circle at 30% 30%, rgba(29,185,84,0.2) 0%, transparent 25%), radial-gradient(circle at 70% 70%, rgba(30,215,96,0.15) 0%, transparent 25%)'
           }} />
           
           <motion.div
@@ -450,7 +522,7 @@ const GeneratePlaylist: React.FC = () => {
             
             <Typography 
               variant="h5" 
-              color="text.secondary" 
+              color="rgba(255, 255, 255, 0.9)"
               sx={{ 
                 maxWidth: '900px', 
                 mx: 'auto',
@@ -462,7 +534,7 @@ const GeneratePlaylist: React.FC = () => {
             >
               Describe your perfect playlist and our AI will create it for you using Spotify's 
               <Box component="span" sx={{ 
-                color: theme.palette.primary.main, 
+                color: '#1DB954', 
                 fontWeight: 700,
                 px: 1
               }}>50 million+ tracks</Box>
@@ -571,18 +643,19 @@ const GeneratePlaylist: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <Paper 
-              elevation={3} 
+              elevation={5} 
               sx={{ 
                 p: { xs: 3, md: 5 }, 
-                background: 'linear-gradient(135deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.04) 100%)',
+                background: 'rgba(21, 40, 21, 0.9)',
                 backdropFilter: 'blur(10px)',
                 borderRadius: '20px',
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                border: '1px solid rgba(29, 185, 84, 0.1)',
                 maxWidth: '1200px',
                 mx: 'auto',
                 mb: 8,
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.15)'
               }}
             >
               {/* Background decoration */}
@@ -608,9 +681,9 @@ const GeneratePlaylist: React.FC = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <Box sx={{ position: 'relative' }}>
                       <FavoriteIcon 
-                        color="primary" 
                         sx={{ 
-                          fontSize: { xs: 30, md: 35 } 
+                          fontSize: { xs: 30, md: 35 },
+                          color: '#1DB954'
                         }} 
                       />
                       <motion.div
@@ -630,7 +703,7 @@ const GeneratePlaylist: React.FC = () => {
                           width: '100%',
                           height: '100%',
                           borderRadius: '50%',
-                          backgroundColor: theme.palette.primary.main,
+                          backgroundColor: '#1DB954',
                           zIndex: -1
                         }}
                       />
@@ -638,7 +711,10 @@ const GeneratePlaylist: React.FC = () => {
                     <Typography 
                       variant="h4" 
                       fontWeight="700"
-                      sx={{ fontSize: { xs: '1.8rem', md: '2.2rem' } }}
+                      sx={{ 
+                        fontSize: { xs: '1.8rem', md: '2.2rem' },
+                        color: 'rgba(255, 255, 255, 0.95)'
+                      }}
                     >
                       Your Favorite Tracks
                     </Typography>
@@ -657,10 +733,13 @@ const GeneratePlaylist: React.FC = () => {
                     }}
                     sx={{ 
                       borderRadius: '12px',
-                      backgroundColor: alpha(theme.palette.primary.main, 0.85),
+                      backgroundColor: '#1DB954',
                       '&:hover': {
-                        backgroundColor: theme.palette.primary.main
-                      }
+                        backgroundColor: '#18a549',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 12px rgba(29,185,84,0.25)'
+                      },
+                      transition: 'all 0.2s ease'
                     }}
                   >
                     Create Playlist From These
@@ -669,7 +748,7 @@ const GeneratePlaylist: React.FC = () => {
                 
                 <Typography 
                   variant="body1" 
-                  color="text.secondary" 
+                  color="rgba(255, 255, 255, 0.8)"
                   sx={{ 
                     mb: 4,
                     maxWidth: '900px',
@@ -681,7 +760,7 @@ const GeneratePlaylist: React.FC = () => {
 
                 {loadingTopTracks ? (
                   <Box sx={{ display: 'flex', justifyContent: 'center', my: 6, height: '200px', alignItems: 'center' }}>
-                    <CircularProgress color="primary" />
+                    <CircularProgress sx={{ color: '#1DB954' }} />
                   </Box>
                 ) : topTracksError ? (
                   <Alert severity="error" sx={{ mb: 4, borderRadius: '12px' }}>
@@ -707,11 +786,15 @@ const GeneratePlaylist: React.FC = () => {
                               height: '100%',
                               borderRadius: '16px',
                               transition: 'all 0.3s ease',
-                              boxShadow: '0 6px 15px rgba(0,0,0,0.07)',
+                              boxShadow: '0 6px 15px rgba(0,0,0,0.1)',
                               overflow: 'hidden',
+                              backgroundColor: 'rgba(15, 24, 16, 0.7)',
+                              borderColor: 'rgba(29, 185, 84, 0.1)',
+                              border: '1px solid rgba(29, 185, 84, 0.1)',
                               '&:hover': {
                                 transform: 'translateY(-8px)',
-                                boxShadow: '0 12px 25px rgba(0,0,0,0.12)'
+                                boxShadow: '0 12px 25px rgba(0,0,0,0.15)',
+                                backgroundColor: 'rgba(29, 185, 84, 0.1)'
                               }
                             }}
                           >
@@ -746,9 +829,9 @@ const GeneratePlaylist: React.FC = () => {
                                     onClick={() => handlePlayPreview(track.id, track.preview_url)}
                                     sx={{ 
                                       color: 'white',
-                                      bgcolor: 'rgba(0,0,0,0.4)',
+                                      bgcolor: 'rgba(29, 185, 84, 0.4)',
                                       '&:hover': {
-                                        bgcolor: 'rgba(0,0,0,0.6)'
+                                        bgcolor: 'rgba(29, 185, 84, 0.6)'
                                       }
                                     }}
                                   >
@@ -765,10 +848,11 @@ const GeneratePlaylist: React.FC = () => {
                                 noWrap 
                                 title={track.name} 
                                 fontWeight="600"
+                                sx={{ color: 'rgba(255, 255, 255, 0.95)' }}
                               >
                                 {track.name}
                               </Typography>
-                              <Typography variant="body2" color="text.secondary" noWrap>
+                              <Typography variant="body2" color="rgba(255, 255, 255, 0.7)" noWrap>
                                 {track.artist}
                               </Typography>
                               {currentlyPlaying === track.id && (
@@ -778,7 +862,7 @@ const GeneratePlaylist: React.FC = () => {
                                   transition={{ duration: 30, ease: 'linear' }}
                                   style={{
                                     height: 3,
-                                    backgroundColor: theme.palette.primary.main,
+                                    backgroundColor: '#1DB954',
                                     marginTop: 8,
                                     borderRadius: 2
                                   }}
@@ -804,12 +888,13 @@ const GeneratePlaylist: React.FC = () => {
           >
             <Paper 
               id="playlist-form"
-              elevation={3} 
+              elevation={5} 
               sx={{ 
                 p: { xs: 3, md: 4 }, 
-                background: 'rgba(15, 24, 16, 0.9)',
+                background: 'rgba(21, 40, 21, 0.9)',
+                backdropFilter: 'blur(10px)',
                 borderRadius: '12px',
-                border: '1px solid rgba(29, 185, 84, 0.2)',
+                border: '1px solid rgba(29, 185, 84, 0.1)',
                 maxWidth: '700px',
                 mx: 'auto',
                 mb: 4,
@@ -822,16 +907,16 @@ const GeneratePlaylist: React.FC = () => {
               <Box sx={{ position: 'relative', zIndex: 1 }}>
                 <Typography 
                   variant="h5" 
-                  fontWeight="bold" 
+                  fontWeight="600" 
                   gutterBottom
                   sx={{ mb: 3, color: 'rgba(255, 255, 255, 0.95)' }}
                 >
-                  Create Your Playlist
+                  Describe Your Playlist
                 </Typography>
                 
                 <TextField
                   label="Describe your playlist"
-                  placeholder="Example: Upbeat indie folk songs for a road trip through California"
+                  placeholder="Try: 'Upbeat indie tracks for a summer road trip' or '2010s summer hits that were popular at beach parties'"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   fullWidth
@@ -877,21 +962,35 @@ const GeneratePlaylist: React.FC = () => {
                     startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <PlaylistAddIcon />}
                     sx={{ 
                       py: 1.2,
-                      px: 4,
+                      px: 3,
                       borderRadius: '8px',
-                      fontWeight: 600
+                      fontWeight: 600,
+                      backgroundColor: '#1DB954',
+                      '&:hover': {
+                        backgroundColor: '#18a549',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 12px rgba(29,185,84,0.25)'
+                      },
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 2px 8px rgba(29,185,84,0.2)'
                     }}
                   >
-                    {loading ? 'Generating...' : 'Generate Playlist'}
+                    {loading ? 'Creating...' : 'Generate Playlist'}
                   </Button>
                   
-                  <Button
-                    variant="text"
+                  <Chip
+                    icon={<LightbulbIcon fontSize="small" />}
+                    label="Show Tips"
                     onClick={() => setShowTips(!showTips)}
-                    sx={{ color: 'text.secondary' }}
-                  >
-                    {showTips ? 'Hide Tips' : 'Show Tips'}
-                  </Button>
+                    variant="outlined"
+                    sx={{ 
+                      borderColor: 'rgba(29,185,84,0.5)', 
+                      color: 'rgba(255,255,255,0.9)',
+                      '&:hover': {
+                        backgroundColor: 'rgba(29,185,84,0.1)'
+                      }
+                    }}
+                  />
                 </Box>
                 
                 {error && (
@@ -958,15 +1057,18 @@ const GeneratePlaylist: React.FC = () => {
             transition={{ duration: 0.5 }}
           >
             <Paper 
-              elevation={3} 
+              elevation={5} 
               sx={{ 
                 p: { xs: 3, md: 4 }, 
                 borderRadius: '12px',
-                background: '#fff',
+                background: 'rgba(21, 40, 21, 0.9)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(29, 185, 84, 0.1)',
                 mb: 6,
                 maxWidth: '700px',
                 mx: 'auto',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.05)'
+                boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+                color: 'rgba(255, 255, 255, 0.9)'
               }}
             >  
               {playlistPreview && (
@@ -974,13 +1076,14 @@ const GeneratePlaylist: React.FC = () => {
                   <Box sx={{ mb: 3 }}>
                     <Typography 
                       variant="h5" 
-                      fontWeight="bold" 
+                      fontWeight="600" 
                       gutterBottom
+                      sx={{ color: 'rgba(255, 255, 255, 0.95)' }}
                     >
                       {playlistPreview.playlist_name.replace('AI Generated: ', '')}
                     </Typography>
                     
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                    <Typography variant="body2" color="rgba(255, 255, 255, 0.7)" gutterBottom>
                       Based on: {description}
                     </Typography>
                     
@@ -993,6 +1096,13 @@ const GeneratePlaylist: React.FC = () => {
                         startIcon={<SpotifyIcon />}
                         sx={{ 
                           borderRadius: '8px',
+                          backgroundColor: '#1DB954',
+                          '&:hover': {
+                            backgroundColor: '#18a549',
+                            transform: 'translateY(-1px)',
+                            boxShadow: '0 4px 12px rgba(29,185,84,0.25)'
+                          },
+                          transition: 'all 0.2s ease'
                         }}
                       >
                         Open in Spotify
@@ -1001,16 +1111,24 @@ const GeneratePlaylist: React.FC = () => {
                         variant="outlined"
                         startIcon={<ReplayIcon />}
                         onClick={handleNewPlaylist}
-                        sx={{ borderRadius: '8px' }}
+                        sx={{ 
+                          borderRadius: '8px',
+                          borderColor: 'rgba(29,185,84,0.5)',
+                          color: 'rgba(255,255,255,0.9)',
+                          '&:hover': {
+                            borderColor: '#1DB954',
+                            backgroundColor: 'rgba(29,185,84,0.1)'
+                          }
+                        }}
                       >
                         New Playlist
                       </Button>
                     </Box>
                   </Box>
                   
-                  <Divider sx={{ my: 3 }} />
+                  <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.1)' }} />
                   
-                  <Typography variant="h6" gutterBottom>
+                  <Typography variant="h6" gutterBottom fontWeight="600" sx={{ color: 'rgba(255, 255, 255, 0.95)' }}>
                     Playlist Songs ({playlistPreview.tracks.length})
                   </Typography>
                   
@@ -1027,7 +1145,14 @@ const GeneratePlaylist: React.FC = () => {
                             borderRadius: '8px',
                             overflow: 'hidden',
                             boxShadow: 'none',
-                            border: '1px solid #eee',
+                            border: '1px solid rgba(29, 185, 84, 0.1)',
+                            backgroundColor: 'rgba(15, 24, 16, 0.7)',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              transform: 'translateY(-2px)',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              backgroundColor: 'rgba(29, 185, 84, 0.1)'
+                            }
                           }}
                         >
                           <CardMedia
@@ -1037,10 +1162,10 @@ const GeneratePlaylist: React.FC = () => {
                             alt={track.name}
                           />
                           <Box sx={{ display: 'flex', flexDirection: 'column', pl: 2, pr: 1, py: 1, flex: 1, overflow: 'hidden' }}>
-                            <Typography variant="subtitle2" noWrap component="div" title={track.name}>
+                            <Typography variant="subtitle2" noWrap component="div" title={track.name} sx={{ color: 'rgba(255, 255, 255, 0.95)' }}>
                               {track.name}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary" noWrap>
+                            <Typography variant="body2" color="rgba(255, 255, 255, 0.7)" noWrap>
                               {track.artist}
                             </Typography>
                           </Box>
@@ -1056,6 +1181,12 @@ const GeneratePlaylist: React.FC = () => {
                         color="primary"
                         href={playlistPreview.playlist_url}
                         target="_blank"
+                        sx={{
+                          color: '#1DB954',
+                          '&:hover': {
+                            backgroundColor: 'rgba(29, 185, 84, 0.1)'
+                          }
+                        }}
                       >
                         See all {playlistPreview.tracks.length} songs on Spotify
                       </Button>
@@ -1118,13 +1249,13 @@ const GeneratePlaylist: React.FC = () => {
           py: 4,
           px: 2,
           mt: 'auto',
-          backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.8),
+          backgroundColor: 'rgba(15, 24, 16, 0.8)',
           backdropFilter: 'blur(10px)',
-          borderTop: '1px solid',
-          borderTopColor: 'divider',
+          borderTop: '1px solid rgba(29, 185, 84, 0.1)',
           textAlign: 'center',
           position: 'relative',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          color: 'rgba(255, 255, 255, 0.7)'
         }}
       >
         {/* Decorative wave background */}
@@ -1151,14 +1282,14 @@ const GeneratePlaylist: React.FC = () => {
           >
             <Typography 
               variant="body1" 
-              color="text.secondary"
               sx={{ 
                 fontSize: { xs: '0.9rem', md: '1rem' },
                 fontWeight: 500,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 1
+                gap: 1,
+                color: 'rgba(255, 255, 255, 0.8)'
               }}
             >
               Made with{' '}
@@ -1187,7 +1318,7 @@ const GeneratePlaylist: React.FC = () => {
                 target="_blank" 
                 rel="noopener noreferrer"
                 sx={{ 
-                  color: theme.palette.primary.main,
+                  color: '#1DB954',
                   fontWeight: 600,
                   textDecoration: 'none',
                   position: 'relative',
@@ -1204,7 +1335,7 @@ const GeneratePlaylist: React.FC = () => {
                     left: 0,
                     width: 0,
                     height: 2,
-                    bgcolor: theme.palette.primary.main,
+                    bgcolor: '#1DB954',
                     transition: 'width 0.3s ease'
                   }
                 }}

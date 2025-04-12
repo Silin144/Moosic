@@ -373,7 +373,7 @@ const Auth: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundImage: 'radial-gradient(circle at 10% 20%, rgba(29, 185, 84, 0.15) 0%, rgba(30, 30, 30, 0.9) 90%)',
+          backgroundImage: 'radial-gradient(circle at 70% 30%, #152815 0%, #0A1F0A 100%)',
           zIndex: 0
         }
       }}
@@ -386,7 +386,7 @@ const Auth: React.FC = () => {
           width: '250px',
           height: '250px',
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(29, 185, 84, 0.1) 0%, rgba(29, 185, 84, 0) 70%)',
+          background: 'radial-gradient(circle, rgba(29, 185, 84, 0.2) 0%, rgba(29, 185, 84, 0) 70%)',
           filter: 'blur(40px)',
           zIndex: 0
         }}
@@ -400,7 +400,7 @@ const Auth: React.FC = () => {
           width: '350px',
           height: '350px',
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(29, 185, 84, 0.07) 0%, rgba(29, 185, 84, 0) 70%)',
+          background: 'radial-gradient(circle, rgba(29, 185, 84, 0.15) 0%, rgba(29, 185, 84, 0) 70%)',
           filter: 'blur(60px)',
           zIndex: 0
         }}
@@ -413,14 +413,14 @@ const Auth: React.FC = () => {
         style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '550px' }}
       >
         <Paper
-          elevation={4}
+          elevation={5}
           sx={{
             p: 5,
             borderRadius: 4,
             textAlign: 'center',
             backdropFilter: 'blur(20px)',
-            backgroundColor: 'rgba(30, 30, 30, 0.8)',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
+            backgroundColor: 'rgba(21, 40, 21, 0.9)',
+            border: '1px solid rgba(29, 185, 84, 0.1)',
             boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
           }}
         >
@@ -465,15 +465,15 @@ const Auth: React.FC = () => {
           
           <Typography 
             variant="h5" 
-            color="text.secondary" 
-            align="center" 
-            mb={5}
             sx={{
               fontWeight: 400,
               maxWidth: '80%',
               mx: 'auto',
-              lineHeight: 1.6
+              lineHeight: 1.6,
+              color: 'rgba(255, 255, 255, 0.9)'
             }}
+            align="center" 
+            mb={5}
           >
             Create personalized playlists with AI
           </Typography>
@@ -489,19 +489,26 @@ const Auth: React.FC = () => {
               fontSize: '1.1rem',
               borderRadius: 30,
               boxShadow: '0 10px 20px rgba(29, 185, 84, 0.2)',
-              width: { xs: '100%', sm: 'auto' }
+              width: { xs: '100%', sm: 'auto' },
+              backgroundColor: '#1DB954',
+              '&:hover': {
+                backgroundColor: '#18a549',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 12px 25px rgba(29,185,84,0.3)'
+              },
+              transition: 'all 0.2s ease'
             }}
           >
             Login with Spotify
           </Button>
           
-          <Typography variant="caption" display="block" mt={4} color="text.secondary">
+          <Typography variant="caption" display="block" mt={4} color="rgba(255, 255, 255, 0.6)">
             By continuing, you agree to our Terms of Service and Privacy Policy
           </Typography>
         </Paper>
         
         <Box mt={4} textAlign="center">
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="rgba(255, 255, 255, 0.6)">
             Powered by Spotify API and OpenAI
           </Typography>
         </Box>
