@@ -24,9 +24,10 @@ import {
   useTheme,
   alpha,
   Link,
-  Badge
+  Badge,
+  useMediaQuery
 } from '@mui/material'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import MusicNoteIcon from '@mui/icons-material/MusicNote'
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
@@ -53,6 +54,9 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import TuneIcon from '@mui/icons-material/Tune'
 import RepeatIcon from '@mui/icons-material/Repeat'
 import HistoryIcon from '@mui/icons-material/History'
+import MusicVideoIcon from '@mui/icons-material/MusicVideo'
+import HeadphonesIcon from '@mui/icons-material/Headphones'
+import LightbulbIcon from '@mui/icons-material/Lightbulb'
 
 interface Track {
   name: string
@@ -86,6 +90,7 @@ interface PlaylistHistory {
 const GeneratePlaylist: React.FC = () => {
   const navigate = useNavigate()
   const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const { isAuthenticated, fetchWithAuth, checkAuthStatus } = useAuth()
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
@@ -105,13 +110,6 @@ const GeneratePlaylist: React.FC = () => {
   const [showTips, setShowTips] = useState<boolean>(true)
   const [playlistHistory, setPlaylistHistory] = useState<PlaylistHistory[]>([])
   const [showHistory, setShowHistory] = useState<boolean>(false)
-  const [recommendedPrompts, setRecommendedPrompts] = useState<string[]>([
-    "Uplifting indie folk with acoustic guitars",
-    "90s hip-hop classics perfect for a road trip",
-    "Modern pop hits with female vocalists",
-    "Electronic ambient music for deep focus and work",
-    "Jazz fusion with elements of funk and soul"
-  ])
 
   // Check auth status only once when component mounts
   React.useEffect(() => {
@@ -394,51 +392,133 @@ const GeneratePlaylist: React.FC = () => {
           right: 0,
           bottom: 0,
           left: 0,
-          backgroundImage: 'radial-gradient(circle at 20% 70%, rgba(29, 185, 84, 0.05) 0%, transparent 50%), radial-gradient(circle at 80% 40%, rgba(29, 185, 84, 0.03) 0%, transparent 60%)',
-          pointerEvents: 'none',
+          background: 'linear-gradient(135deg, rgba(29,185,84,0.08) 0%, rgba(30,215,96,0.03) 100%)',
           zIndex: -1,
         }
       }}>
         <Box sx={{ 
           mb: 6, 
+          position: 'relative',
           textAlign: 'center',
-          background: `linear-gradient(to right, ${alpha(theme.palette.primary.main, 0.2)}, transparent)`,
-          p: 4,
-          borderRadius: 4
+          background: 'linear-gradient(135deg, rgba(29,185,84,0.3) 0%, rgba(30,215,96,0.1) 100%)',
+          p: { xs: 3, md: 4 },
+          pt: { xs: 6, md: 8 },
+          pb: { xs: 8, md: 10 },
+          borderRadius: '20px',
+          overflow: 'hidden',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
         }}>
+          {/* Animated background elements */}
+          <Box sx={{ 
+            position: 'absolute', 
+            top: '-10%', 
+            left: '-5%', 
+            width: '120%', 
+            height: '120%', 
+            zIndex: -1,
+            opacity: 0.6,
+            background: 'radial-gradient(circle at 30% 30%, rgba(29,185,84,0.4) 0%, transparent 25%), radial-gradient(circle at 70% 70%, rgba(30,215,96,0.3) 0%, transparent 25%)'
+          }} />
+          
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.7, type: 'spring' }}
           >
             <Typography 
-              variant="h2" 
+              variant={isMobile ? "h3" : "h1"} 
               component="h1" 
               gutterBottom
               sx={{ 
-                fontWeight: 700,
-                background: 'linear-gradient(45deg, #1DB954 30%, #1ED760 90%)',
+                fontWeight: 800,
+                background: 'linear-gradient(90deg, #1DB954 0%, #1ED760 50%, #1DB954 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
-                textShadow: '0px 4px 20px rgba(0, 0, 0, 0.4)',
-                mb: 2
+                backgroundSize: '200% auto',
+                animation: 'gradient 5s ease infinite',
+                textShadow: '0px 5px 25px rgba(0, 0, 0, 0.4)',
+                mb: 2,
+                '@keyframes gradient': {
+                  '0%': { backgroundPosition: '0% center' },
+                  '50%': { backgroundPosition: '100% center' },
+                  '100%': { backgroundPosition: '0% center' },
+                }
               }}
             >
-              AI Playlist Generator
+              Spotify Playlist AI
             </Typography>
+            
             <Typography 
               variant="h5" 
               color="text.secondary" 
               sx={{ 
-                maxWidth: '800px', 
+                maxWidth: '900px', 
                 mx: 'auto',
-                lineHeight: 1.6
+                lineHeight: 1.6,
+                fontWeight: 500,
+                fontSize: { xs: '1.1rem', md: '1.3rem' },
+                px: { xs: 1, md: 4 }
               }}
             >
-              Describe your perfect playlist, and our AI will curate it for you.
-              <br />
-              From eras and moods to specific artists and genres - anything goes!
+              Describe your perfect playlist and our AI will create it for you using Spotify's 
+              <Box component="span" sx={{ 
+                color: theme.palette.primary.main, 
+                fontWeight: 700,
+                px: 1
+              }}>50 million+ tracks</Box>
             </Typography>
+            
+            {/* Animated music notes */}
+            <Box sx={{ position: 'absolute', width: '100%', height: '100%', top: 0, left: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+              {[...Array(8)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  style={{
+                    position: 'absolute',
+                    x: `${Math.random() * 90 + 5}%`,
+                    y: `${Math.random() * 90 + 5}%`,
+                    opacity: 0.4
+                  }}
+                  animate={{
+                    y: [
+                      `${Math.random() * 90 + 5}%`, 
+                      `${Math.random() * 20}%`
+                    ],
+                    opacity: [0.4, 0.7, 0],
+                    scale: [1, 1.2, 0.8, 0]
+                  }}
+                  transition={{
+                    duration: 10 + Math.random() * 20,
+                    repeat: Infinity,
+                    repeatType: 'loop',
+                    ease: 'easeInOut'
+                  }}
+                >
+                  {i % 3 === 0 ? (
+                    <MusicNoteIcon 
+                      sx={{ 
+                        fontSize: 30 + Math.random() * 30,
+                        color: alpha('#1DB954', 0.6)
+                      }} 
+                    />
+                  ) : i % 3 === 1 ? (
+                    <HeadphonesIcon 
+                      sx={{ 
+                        fontSize: 25 + Math.random() * 20,
+                        color: alpha('#1DB954', 0.5)
+                      }} 
+                    />
+                  ) : (
+                    <MusicVideoIcon 
+                      sx={{ 
+                        fontSize: 25 + Math.random() * 20,
+                        color: alpha('#1DB954', 0.5) 
+                      }} 
+                    />
+                  )}
+                </motion.div>
+              ))}
+            </Box>
           </motion.div>
         </Box>
 
@@ -455,7 +535,7 @@ const GeneratePlaylist: React.FC = () => {
                 p: 4, 
                 background: alpha(theme.palette.background.paper, 0.8),
                 backdropFilter: 'blur(10px)',
-                borderRadius: 4,
+                borderRadius: '20px',
                 border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
                 maxWidth: '900px',
                 mx: 'auto',
@@ -483,351 +563,234 @@ const GeneratePlaylist: React.FC = () => {
           </motion.div>
         )}
 
-        {/* Recommended For You Section */}
-        {!playlistPreview && isAuthenticated && (
+        {/* Top Tracks Section - show always below the playlist generator/preview */}
+        {topTracks.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
           >
             <Paper 
               elevation={3} 
               sx={{ 
-                p: 4, 
-                background: alpha(theme.palette.background.paper, 0.8),
+                p: { xs: 3, md: 5 }, 
+                background: 'linear-gradient(135deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.04) 100%)',
                 backdropFilter: 'blur(10px)',
-                borderRadius: 4,
+                borderRadius: '20px',
                 border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                maxWidth: '900px',
+                maxWidth: '1200px',
                 mx: 'auto',
-                mb: 6
+                mb: 8,
+                position: 'relative',
+                overflow: 'hidden'
               }}
             >
-              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <SpotifyIcon color="primary" sx={{ fontSize: 30 }} />
-                  <Typography variant="h4" fontWeight="600">
-                    Recommended For You
-                  </Typography>
-                </Box>
-              </Box>
+              {/* Background decoration */}
+              <Box sx={{ 
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                background: 'radial-gradient(circle at 20% 30%, rgba(29,185,84,0.07) 0%, transparent 30%)',
+                zIndex: 0
+              }} />
               
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Try these personalized playlist ideas based on your listening habits
-              </Typography>
-
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
-                {recommendedPrompts.map((prompt, index) => (
-                  <Box 
-                    key={index}
-                    sx={{
-                      p: 2,
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                      borderRadius: 2,
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      width: { xs: '100%', sm: 'calc(50% - 8px)', md: 'calc(33.33% - 11px)' },
-                      '&:hover': {
-                        transform: 'translateY(-4px)',
-                        boxShadow: (theme) => `0 8px 20px ${alpha(theme.palette.common.black, 0.1)}`,
-                        bgcolor: alpha(theme.palette.primary.main, 0.05)
-                      }
-                    }}
+              <Box sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ 
+                  mb: 4, 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: { xs: 'flex-start', md: 'center' },
+                  flexDirection: { xs: 'column', md: 'row' },
+                  gap: 2
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box sx={{ position: 'relative' }}>
+                      <FavoriteIcon 
+                        color="primary" 
+                        sx={{ 
+                          fontSize: { xs: 30, md: 35 } 
+                        }} 
+                      />
+                      <motion.div
+                        animate={{
+                          scale: [1, 1.2, 1],
+                          opacity: [0.5, 1, 0.5]
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          repeatType: "loop"
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          borderRadius: '50%',
+                          backgroundColor: theme.palette.primary.main,
+                          zIndex: -1
+                        }}
+                      />
+                    </Box>
+                    <Typography 
+                      variant="h4" 
+                      fontWeight="700"
+                      sx={{ fontSize: { xs: '1.8rem', md: '2.2rem' } }}
+                    >
+                      Your Favorite Tracks
+                    </Typography>
+                  </Box>
+                  <Button 
+                    variant="contained" 
+                    size="medium"
+                    startIcon={<PlaylistAddIcon />}
                     onClick={() => {
-                      setDescription(prompt);
+                      setDescription("Create a playlist inspired by my top tracks with similar vibes but also some fresh discoveries");
+                      // Scroll to the playlist generation section
                       const playlistFormElement = document.getElementById('playlist-form');
                       if (playlistFormElement) {
                         playlistFormElement.scrollIntoView({ behavior: 'smooth' });
                       }
                     }}
-                  >
-                    <Typography variant="subtitle1">{prompt}</Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-                      <Button 
-                        size="small" 
-                        variant="text" 
-                        startIcon={<PlaylistAddIcon />}
-                      >
-                        Generate
-                      </Button>
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSavePrompt(prompt);
-                        }}
-                      >
-                        {isPromptSaved(prompt) ? <BookmarkIcon color="primary" /> : <BookmarkBorderIcon />}
-                      </IconButton>
-                    </Box>
-                  </Box>
-                ))}
-              </Box>
-            </Paper>
-          </motion.div>
-        )}
-        
-        {/* History Section */}
-        {!playlistPreview && playlistHistory.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            <Paper 
-              elevation={3} 
-              sx={{ 
-                p: 4, 
-                background: alpha(theme.palette.background.paper, 0.8),
-                backdropFilter: 'blur(10px)',
-                borderRadius: 4,
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                maxWidth: '900px',
-                mx: 'auto',
-                mb: 6
-              }}
-            >
-              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <HistoryIcon color="primary" sx={{ fontSize: 30 }} />
-                  <Typography variant="h4" fontWeight="600">
-                    Recently Generated
-                  </Typography>
-                </Box>
-                <Button 
-                  variant="text" 
-                  size="small"
-                  onClick={() => setShowHistory(!showHistory)}
-                >
-                  {showHistory ? "Show Less" : "View All"}
-                </Button>
-              </Box>
-              
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Your recently created playlists
-              </Typography>
-
-              <Box sx={{ mb: 3 }}>
-                {(showHistory ? playlistHistory : playlistHistory.slice(0, 3)).map((playlist, index) => (
-                  <Box
-                    key={playlist.id}
-                    sx={{
-                      p: 2,
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                      borderRadius: 2,
-                      mb: 2,
-                      transition: 'all 0.2s ease',
+                    sx={{ 
+                      borderRadius: '12px',
+                      backgroundColor: alpha(theme.palette.primary.main, 0.85),
                       '&:hover': {
-                        boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.common.black, 0.1)}`,
+                        backgroundColor: theme.palette.primary.main
                       }
                     }}
                   >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <Box>
-                        <Typography variant="subtitle1" fontWeight="medium">
-                          {playlist.name.replace('AI Generated: ', '')}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          {playlist.description}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(playlist.createdAt).toLocaleDateString()}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          href={playlist.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          startIcon={<SpotifyIcon />}
-                          sx={{ borderRadius: 4 }}
-                        >
-                          Open
-                        </Button>
-                      </Box>
-                    </Box>
-                    {playlist.tracks.length > 0 && (
-                      <Box sx={{ display: 'flex', mt: 2, gap: 1, flexWrap: 'nowrap', overflow: 'hidden' }}>
-                        {playlist.tracks.map((track, idx) => (
-                          <Box 
-                            key={idx} 
-                            sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              p: 1, 
-                              borderRadius: 1,
-                              bgcolor: alpha(theme.palette.background.paper, 0.4),
-                              minWidth: 0,
-                              maxWidth: { xs: '100%', sm: '33%' },
-                              flex: '1 0 auto'
-                            }}
-                          >
-                            <Avatar 
-                              src={track.album_image} 
-                              variant="rounded" 
-                              sx={{ width: 32, height: 32, mr: 1 }} 
-                            />
-                            <Box sx={{ minWidth: 0 }}>
-                              <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 'medium' }}>
-                                {track.name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                                {track.artist}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        ))}
-                      </Box>
-                    )}
-                  </Box>
-                ))}
-              </Box>
-            </Paper>
-          </motion.div>
-        )}
-
-        {/* Top Tracks Section - show only when no playlist is being previewed */}
-        {!playlistPreview && topTracks.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <Paper 
-              elevation={3} 
-              sx={{ 
-                p: 4, 
-                background: alpha(theme.palette.background.paper, 0.8),
-                backdropFilter: 'blur(10px)',
-                borderRadius: 4,
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                maxWidth: '900px',
-                mx: 'auto',
-                mb: 6
-              }}
-            >
-              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <FavoriteIcon color="primary" sx={{ fontSize: 30 }} />
-                  <Typography variant="h4" fontWeight="600">
-                    Your Top Tracks
-                  </Typography>
+                    Create Playlist From These
+                  </Button>
                 </Box>
-                <Button 
-                  variant="outlined" 
-                  size="small"
-                  startIcon={<PlaylistAddIcon />}
-                  onClick={() => {
-                    setDescription("Create a playlist based on my top tracks with similar vibes");
-                    // Scroll to the playlist generation section
-                    const playlistFormElement = document.getElementById('playlist-form');
-                    if (playlistFormElement) {
-                      playlistFormElement.scrollIntoView({ behavior: 'smooth' });
-                    }
+                
+                <Typography 
+                  variant="body1" 
+                  color="text.secondary" 
+                  sx={{ 
+                    mb: 4,
+                    maxWidth: '900px',
+                    fontSize: { xs: '1rem', md: '1.1rem' }
                   }}
                 >
-                  Generate Similar Playlist
-                </Button>
-              </Box>
-              
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                These are your most listened tracks on Spotify. Use them as inspiration for your next playlist!
-              </Typography>
+                  These are your most listened tracks on Spotify. Get inspired by your listening habits or create a playlist with similar vibes.
+                </Typography>
 
-              {loadingTopTracks ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-                  <CircularProgress />
-                </Box>
-              ) : topTracksError ? (
-                <Alert severity="error" sx={{ mb: 3 }}>
-                  {topTracksError}
-                </Alert>
-              ) : (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                  {topTracks.slice(0, 8).map((track, index) => (
-                    <Box 
-                      key={track.id}
-                      sx={{ 
-                        width: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(25% - 16px)' }
-                      }}
-                    >
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                {loadingTopTracks ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', my: 6, height: '200px', alignItems: 'center' }}>
+                    <CircularProgress color="primary" />
+                  </Box>
+                ) : topTracksError ? (
+                  <Alert severity="error" sx={{ mb: 4, borderRadius: '12px' }}>
+                    {topTracksError}
+                  </Alert>
+                ) : (
+                  <Grid container spacing={3}>
+                    {topTracks.slice(0, 8).map((track, index) => (
+                      <Grid 
+                        key={track.id}
+                        size={{ xs: 12, sm: 6, md: 3 }}
                       >
-                        <Card 
-                          sx={{ 
-                            display: 'flex', 
-                            flexDirection: 'column',
-                            height: '100%',
-                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                            '&:hover': {
-                              transform: 'translateY(-4px)',
-                              boxShadow: (theme) => `0 8px 20px ${alpha(theme.palette.common.black, 0.15)}`
-                            }
-                          }}
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4, delay: index * 0.05 }}
                         >
-                          <Box sx={{ position: 'relative' }}>
-                            <CardMedia
-                              component="img"
-                              height="160"
-                              image={track.album_image || 'https://via.placeholder.com/160?text=Album+Cover'}
-                              alt={track.name}
-                            />
-                            <Box
-                              sx={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                height: '100%',
-                                bgcolor: 'rgba(0,0,0,0.3)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                opacity: 0,
-                                transition: 'opacity 0.3s ease',
-                                '&:hover': {
-                                  opacity: 1
-                                }
-                              }}
-                            >
-                              {track.preview_url && (
-                                <IconButton
-                                  onClick={() => handlePlayPreview(track.id, track.preview_url)}
-                                  sx={{ 
-                                    color: 'white',
-                                    bgcolor: 'rgba(0,0,0,0.4)',
-                                    '&:hover': {
-                                      bgcolor: 'rgba(0,0,0,0.6)'
-                                    }
-                                  }}
-                                >
-                                  {currentlyPlaying === track.id ? <PauseIcon /> : <PlayArrowIcon />}
-                                </IconButton>
-                              )}
+                          <Card 
+                            sx={{ 
+                              display: 'flex', 
+                              flexDirection: 'column',
+                              height: '100%',
+                              borderRadius: '16px',
+                              transition: 'all 0.3s ease',
+                              boxShadow: '0 6px 15px rgba(0,0,0,0.07)',
+                              overflow: 'hidden',
+                              '&:hover': {
+                                transform: 'translateY(-8px)',
+                                boxShadow: '0 12px 25px rgba(0,0,0,0.12)'
+                              }
+                            }}
+                          >
+                            <Box sx={{ position: 'relative' }}>
+                              <CardMedia
+                                component="img"
+                                height="180"
+                                image={track.album_image || 'https://via.placeholder.com/180?text=Album+Cover'}
+                                alt={track.name}
+                                sx={{ objectFit: 'cover' }}
+                              />
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '100%',
+                                  height: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: 'rgba(0,0,0,0.3)',
+                                  opacity: 0,
+                                  transition: 'opacity 0.3s ease',
+                                  '&:hover': {
+                                    opacity: 1
+                                  }
+                                }}
+                              >
+                                {track.preview_url && (
+                                  <IconButton
+                                    onClick={() => handlePlayPreview(track.id, track.preview_url)}
+                                    sx={{ 
+                                      color: 'white',
+                                      bgcolor: 'rgba(0,0,0,0.4)',
+                                      '&:hover': {
+                                        bgcolor: 'rgba(0,0,0,0.6)'
+                                      }
+                                    }}
+                                  >
+                                    {currentlyPlaying === track.id ? <PauseIcon /> : <PlayArrowIcon />}
+                                  </IconButton>
+                                )}
+                              </Box>
                             </Box>
-                          </Box>
-                          <CardContent sx={{ flexGrow: 1 }}>
-                            <Typography variant="subtitle1" component="div" noWrap title={track.name} fontWeight="medium">
-                              {track.name}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" noWrap>
-                              {track.artist}
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    </Box>
-                  ))}
-                </Box>
-              )}
+                            <CardContent sx={{ flexGrow: 1, pt: 2 }}>
+                              <Typography 
+                                variant="subtitle1" 
+                                component="div" 
+                                gutterBottom 
+                                noWrap 
+                                title={track.name} 
+                                fontWeight="600"
+                              >
+                                {track.name}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary" noWrap>
+                                {track.artist}
+                              </Typography>
+                              {currentlyPlaying === track.id && (
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{ width: '100%' }}
+                                  transition={{ duration: 30, ease: 'linear' }}
+                                  style={{
+                                    height: 3,
+                                    backgroundColor: theme.palette.primary.main,
+                                    marginTop: 8,
+                                    borderRadius: 2
+                                  }}
+                                />
+                              )}
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
+              </Box>
             </Paper>
           </motion.div>
         )}
@@ -842,326 +805,97 @@ const GeneratePlaylist: React.FC = () => {
               id="playlist-form"
               elevation={3} 
               sx={{ 
-                p: 4, 
-                background: alpha(theme.palette.background.paper, 0.8),
-                backdropFilter: 'blur(10px)',
-                borderRadius: 4,
+                p: { xs: 3, md: 5 }, 
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.8) 100%)',
+                backdropFilter: 'blur(20px)',
+                borderRadius: '20px',
                 border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
                 maxWidth: '900px',
                 mx: 'auto',
-                mb: 6
-              }}
-            >
-              <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-                <MusicNoteIcon color="primary" sx={{ fontSize: 30 }} />
-                <Typography variant="h4" fontWeight="600">
-                  Describe Your Playlist
-                </Typography>
-              </Box>
-              
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Try something like "2016 summer hits," "chill lo-fi beats for studying," or "energetic 80s workout mix"
-              </Typography>
-
-              <TextField
-                fullWidth
-                multiline
-                rows={4}
-                variant="outlined"
-                label="What kind of playlist do you want?"
-                placeholder="For example: 'Upbeat 90s rock songs that remind me of road trips' or '2023 chill pop hits to relax to'"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                sx={{ mb: 1 }}
-              />
-              
-              {/* Bookmark & Saved prompt controls */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  {description.trim() && (
-                    <Tooltip title={isPromptSaved(description) ? "Remove from saved" : "Save this prompt"}>
-                      <IconButton 
-                        size="small" 
-                        color="primary" 
-                        onClick={() => handleSavePrompt(description)}
-                        sx={{ mr: 1 }}
-                      >
-                        {isPromptSaved(description) ? <BookmarkIcon /> : <BookmarkBorderIcon />}
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  
-                  <Button 
-                    variant="text" 
-                    size="small" 
-                    startIcon={<BookmarkIcon />}
-                    onClick={() => setShowSavedPrompts(!showSavedPrompts)}
-                    disabled={savedPrompts.length === 0}
-                  >
-                    {showSavedPrompts ? "Hide saved" : `Saved prompts (${savedPrompts.length})`}
-                  </Button>
-                </Box>
-                
-                <Button
-                  variant="text"
-                  size="small"
-                  startIcon={showTips ? <InfoOutlinedIcon /> : <TuneIcon />}
-                  onClick={() => setShowTips(!showTips)}
-                >
-                  {showTips ? "Hide tips" : "Show tips"}
-                </Button>
-              </Box>
-
-              {/* Saved prompts dropdown */}
-              {showSavedPrompts && savedPrompts.length > 0 && (
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    mb: 3, 
-                    p: 2,
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
-                  }}
-                >
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Your saved prompts:
-                  </Typography>
-                  <Stack spacing={1}>
-                    {savedPrompts.map((prompt, index) => (
-                      <Box 
-                        key={index}
-                        sx={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          p: 1,
-                          borderRadius: 1,
-                          cursor: 'pointer',
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05) }
-                        }}
-                        onClick={() => setDescription(prompt)}
-                      >
-                        <Typography variant="body2" noWrap sx={{ maxWidth: '80%' }}>
-                          {prompt}
-                        </Typography>
-                        <Box>
-                          <IconButton 
-                            size="small" 
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setDescription(prompt)
-                            }}
-                          >
-                            <RepeatIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton 
-                            size="small" 
-                            color="primary"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleSavePrompt(prompt)
-                            }}
-                          >
-                            <BookmarkIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </Box>
-                    ))}
-                  </Stack>
-                </Paper>
-              )}
-
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-                <Typography variant="subtitle1" color="text.secondary">
-                  Playlist Options
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                  <Chip 
-                    label="15-20 songs" 
-                    color="primary" 
-                    variant="filled" 
-                    sx={{ fontWeight: 'medium' }} 
-                  />
-                  <Chip 
-                    label="No karaoke versions" 
-                    color="primary" 
-                    variant="filled" 
-                    sx={{ fontWeight: 'medium' }} 
-                  />
-                  <Chip 
-                    label="Based on your taste" 
-                    color="primary" 
-                    variant="filled" 
-                    sx={{ fontWeight: 'medium' }} 
-                  />
-                </Box>
-              </Box>
-
-              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                <Button
-                  variant="contained"
-                  onClick={handleGenerate}
-                  disabled={loading}
-                  size="large"
-                  startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <PlaylistAddIcon />}
-                  sx={{ px: 4, py: 1.5, fontSize: '1.1rem' }}
-                >
-                  {loading ? 'Creating Your Playlist...' : 'Generate Playlist'}
-                </Button>
-              </Box>
-
-              {error && (
-                <Alert severity="error" sx={{ mt: 3 }}>
-                  {error}
-                </Alert>
-              )}
-            </Paper>
-            
-            <Box sx={{ textAlign: 'center', mb: 8 }}>
-              <Typography variant="h6" gutterBottom color="text.secondary">
-                Playlist Creation Tips
-              </Typography>
-              <Paper 
-                elevation={1} 
-                sx={{ 
-                  p: 3, 
-                  background: alpha(theme.palette.background.paper, 0.6),
-                  backdropFilter: 'blur(10px)',
-                  borderRadius: 2,
-                  maxWidth: '900px',
-                  mx: 'auto',
-                  mb: 4
-                }}
-              >
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3, textAlign: 'left' }}>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Better Results
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      • Be specific about genres, moods, and time periods<br />
-                      • Mention activities like "running" or "studying"<br />
-                      • Include specific artists as inspiration<br />
-                      • Describe the emotional feeling you want
-                    </Typography>
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Try Combining
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      • Mix genres: "Folk + electronic fusion"<br />
-                      • Blend eras: "80s synth with modern vocals"<br />
-                      • Specify transitions: "Starting upbeat, ending relaxed"<br />
-                      • Cultural mixes: "K-pop meets Latin rhythms"
-                    </Typography>
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Fun Ideas
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      • Songs that tell a story when played in order<br />
-                      • Music from your favorite TV show/movie<br />
-                      • A journey through music history by decade<br />
-                      • Hidden gems from popular artists
-                    </Typography>
-                  </Box>
-                </Box>
-              </Paper>
-              <Typography variant="h6" gutterBottom color="text.secondary">
-                Popular Ideas to Try
-              </Typography>
-              <Stack 
-                direction={{ xs: 'column', sm: 'row' }} 
-                spacing={1} 
-                justifyContent="center"
-                flexWrap="wrap"
-                useFlexGap
-                sx={{ '& > *': { m: 0.5 } }}
-              >
-                <Chip 
-                  label="2010s Summer Hits" 
-                  color="primary" 
-                  variant="outlined" 
-                  onClick={() => setDescription("2010s summer hits that were popular at beach parties")}
-                />
-                <Chip 
-                  label="90s R&B Classics" 
-                  color="primary" 
-                  variant="outlined" 
-                  onClick={() => setDescription("Classic 90s R&B songs that defined the era")}
-                />
-                <Chip 
-                  label="Indie Folk for Rainy Days" 
-                  color="primary" 
-                  variant="outlined" 
-                  onClick={() => setDescription("Calming indie folk songs perfect for rainy days with a cup of coffee")}
-                />
-                <Chip 
-                  label="80s Workout Mix" 
-                  color="primary" 
-                  variant="outlined" 
-                  onClick={() => setDescription("Energetic 80s songs for a retro workout session")}
-                />
-                <Chip 
-                  label="2023 Pop Hits" 
-                  color="primary" 
-                  variant="outlined" 
-                  onClick={() => setDescription("Latest pop hits from 2023 that are topping the charts")}
-                />
-              </Stack>
-            </Box>
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <Paper 
-              elevation={3} 
-              sx={{ 
-                p: 4, 
-                borderRadius: 4,
-                background: alpha(theme.palette.background.paper, 0.8),
-                backdropFilter: 'blur(10px)',
-                mb: 4,
+                mb: 6,
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                boxShadow: '0 15px 50px rgba(0,0,0,0.15)'
               }}
             >
+              {/* Decorative background elements */}
               <Box sx={{ 
                 position: 'absolute', 
                 top: 0, 
                 right: 0, 
-                width: '30%', 
+                width: '100%', 
                 height: '100%',
-                background: `linear-gradient(135deg, transparent 0%, ${alpha(theme.palette.primary.main, 0.1)} 100%)`,
+                background: 'radial-gradient(circle at 90% 10%, rgba(29,185,84,0.15) 0%, transparent 50%), radial-gradient(circle at 10% 90%, rgba(30,215,96,0.1) 0%, transparent 50%)',
                 zIndex: 0,
-                borderRadius: 4
+                borderRadius: '20px'
               }} />
               
               <Box sx={{ position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4, flexWrap: 'wrap', gap: 2 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'flex-start', 
+                  mb: 4, 
+                  flexWrap: 'wrap', 
+                  gap: 2,
+                  flexDirection: { xs: 'column', md: 'row' }
+                }}>
                   <Box>
-                    <Typography variant="overline" color="primary">
-                      Your New Playlist
-                    </Typography>
-                    <Typography variant="h3" fontWeight="bold" gutterBottom>
-                      {playlistPreview.playlist_name.replace('AI Generated: ', '')}
-                    </Typography>
-                    <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-                      Based on: {description}
-                    </Typography>
-                    <Box sx={{ display: 'flex', mt: 2, gap: 2 }}>
+                    <motion.div
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5 }}
+                    >
+                      <Typography 
+                        variant="overline" 
+                        sx={{ 
+                          color: theme.palette.primary.main,
+                          fontWeight: 600,
+                          letterSpacing: 1.5
+                        }}
+                      >
+                        YOUR NEW PLAYLIST IS READY
+                      </Typography>
+                      <Typography 
+                        variant="h3" 
+                        fontWeight="bold" 
+                        gutterBottom
+                        sx={{ 
+                          fontSize: { xs: '1.8rem', md: '2.5rem' },
+                          background: 'linear-gradient(90deg, #1DB954 0%, #1ED760 100%)',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                        }}
+                      >
+                        {playlistPreview && (playlistPreview as PlaylistPreview).playlist_name.replace('AI Generated: ', '')}
+                      </Typography>
+                      <Typography 
+                        variant="subtitle1" 
+                        color="text.secondary" 
+                        gutterBottom
+                        sx={{ fontWeight: 500 }}
+                      >
+                        Based on: {description}
+                      </Typography>
+                    </motion.div>
+                    
+                    <Box sx={{ 
+                      display: 'flex', 
+                      mt: 3, 
+                      gap: 2,
+                      flexWrap: 'wrap'
+                    }}>
                       <Button
                         variant="contained"
-                        href={playlistPreview.playlist_url}
+                        href={playlistPreview ? (playlistPreview as PlaylistPreview).playlist_url : '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         startIcon={<SpotifyIcon />}
+                        sx={{ 
+                          borderRadius: '12px',
+                          boxShadow: '0 8px 20px rgba(29,185,84,0.3)',
+                          background: 'linear-gradient(90deg, #1DB954 0%, #1ED760 100%)',
+                        }}
                       >
                         Open in Spotify
                       </Button>
@@ -1169,6 +903,7 @@ const GeneratePlaylist: React.FC = () => {
                         variant="outlined"
                         startIcon={<ReplayIcon />}
                         onClick={handleNewPlaylist}
+                        sx={{ borderRadius: '12px' }}
                       >
                         Create New Playlist
                       </Button>
@@ -1176,21 +911,26 @@ const GeneratePlaylist: React.FC = () => {
                         variant="outlined"
                         startIcon={<BookmarkBorderIcon />}
                         onClick={() => handleSavePrompt(description)}
-                        sx={{ display: { xs: 'none', sm: 'flex' } }}
+                        sx={{ display: { xs: 'none', sm: 'flex' }, borderRadius: '12px' }}
                       >
                         Save Prompt
                       </Button>
                     </Box>
                   </Box>
                   
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    gap: 1,
+                    alignSelf: { xs: 'flex-start', md: 'center' }
+                  }}>
                     <Tooltip title="Share Playlist">
                       <IconButton 
                         color="primary" 
                         size="large"
                         sx={{ 
                           bgcolor: alpha(theme.palette.primary.main, 0.1),
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
+                          borderRadius: '12px'
                         }}
                       >
                         <ShareIcon />
@@ -1203,7 +943,8 @@ const GeneratePlaylist: React.FC = () => {
                         onClick={handleMenuOpen}
                         sx={{ 
                           bgcolor: alpha(theme.palette.primary.main, 0.1),
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
+                          borderRadius: '12px'
                         }}
                       >
                         <MoreVertIcon />
@@ -1215,10 +956,10 @@ const GeneratePlaylist: React.FC = () => {
                 <Divider sx={{ my: 3 }} />
                 
                 <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <AudiotrackIcon /> 
-                  Playlist Songs 
+                  <AudiotrackIcon color="primary" /> 
+                  <span>Playlist Songs</span>
                   <Badge 
-                    badgeContent={playlistPreview.tracks.length} 
+                    badgeContent={playlistPreview ? (playlistPreview as PlaylistPreview).tracks.length : 0} 
                     color="primary"
                     sx={{ 
                       '& .MuiBadge-badge': { 
@@ -1231,19 +972,16 @@ const GeneratePlaylist: React.FC = () => {
                   />
                 </Typography>
                 
-                <Grid container spacing={3} sx={{ mt: 1 }}>
-                  {playlistPreview.tracks.map((track, index) => (
-                    <Box 
-                      key={index} 
-                      sx={{ 
-                        width: { xs: '100%', sm: '50%', md: '33.33%', lg: '25%' },
-                        padding: 1.5
-                      }}
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  {playlistPreview && (playlistPreview as PlaylistPreview).tracks.map((track: Track, index: number) => (
+                    <Grid 
+                      key={index}
+                      size={{ xs: 12, sm: 6, md: 4, lg: 3 }}
                     >
                       <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        transition={{ duration: 0.3, delay: index * 0.03 }}
                       >
                         <Card 
                           sx={{ 
@@ -1252,10 +990,12 @@ const GeneratePlaylist: React.FC = () => {
                             flexDirection: 'column',
                             position: 'relative',
                             overflow: 'hidden',
-                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                            transition: 'all 0.3s ease',
+                            borderRadius: '16px',
+                            boxShadow: '0 4px 15px rgba(0,0,0,0.07)',
                             '&:hover': {
                               transform: 'translateY(-8px)',
-                              boxShadow: (theme) => `0 12px 28px ${alpha(theme.palette.common.black, 0.2)}`
+                              boxShadow: (theme) => `0 12px 28px ${alpha(theme.palette.common.black, 0.15)}`
                             }
                           }}
                           onMouseEnter={() => setHoverTrack(index)}
@@ -1264,8 +1004,8 @@ const GeneratePlaylist: React.FC = () => {
                           <Box sx={{ position: 'relative' }}>
                             <CardMedia
                               component="img"
-                              height="200"
-                              image={track.album_image || 'https://via.placeholder.com/200?text=Album+Cover'}
+                              height="160"
+                              image={track.album_image || 'https://via.placeholder.com/160?text=Album+Cover'}
                               alt={track.name}
                               sx={{ objectFit: 'cover' }}
                             />
@@ -1295,7 +1035,7 @@ const GeneratePlaylist: React.FC = () => {
                             )}
                           </Box>
                           <CardContent sx={{ flexGrow: 1, pb: 1 }}>
-                            <Typography variant="h6" component="div" noWrap title={track.name}>
+                            <Typography variant="subtitle1" component="div" noWrap title={track.name} fontWeight="medium">
                               {track.name}
                             </Typography>
                             <Typography 
@@ -1315,10 +1055,375 @@ const GeneratePlaylist: React.FC = () => {
                           </CardContent>
                         </Card>
                       </motion.div>
-                    </Box>
+                    </Grid>
                   ))}
                 </Grid>
               </Box>
+            </Paper>
+            
+            <Box sx={{ textAlign: 'center', mb: 5 }}>
+              <Typography variant="h6" gutterBottom color="text.secondary" fontWeight="600">
+                Playlist Creation Tips
+              </Typography>
+              <Paper 
+                elevation={1} 
+                sx={{ 
+                  p: 3, 
+                  background: alpha(theme.palette.background.paper, 0.6),
+                  backdropFilter: 'blur(10px)',
+                  borderRadius: '16px',
+                  maxWidth: '900px',
+                  mx: 'auto',
+                  mb: 4
+                }}
+              >
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3, textAlign: 'left' }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom color={theme.palette.primary.main}>
+                      🏆 Better Results
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      • Be specific about genres, moods, and time periods<br />
+                      • Mention activities like "running" or "studying"<br />
+                      • Include specific artists as inspiration<br />
+                      • Describe the emotional feeling you want
+                    </Typography>
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom color={theme.palette.primary.main}>
+                      🔄 Try Combining
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      • Mix genres: "Folk + electronic fusion"<br />
+                      • Blend eras: "80s synth with modern vocals"<br />
+                      • Specify transitions: "Starting upbeat, ending relaxed"<br />
+                      • Cultural mixes: "K-pop meets Latin rhythms"
+                    </Typography>
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom color={theme.palette.primary.main}>
+                      💡 Fun Ideas
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      • Songs that tell a story when played in order<br />
+                      • Music from your favorite TV show/movie<br />
+                      • A journey through music history by decade<br />
+                      • Hidden gems from popular artists
+                    </Typography>
+                  </Box>
+                </Box>
+              </Paper>
+              <Typography variant="h6" gutterBottom color="text.secondary" fontWeight="600">
+                Try These Quick Ideas
+              </Typography>
+              <Stack 
+                direction="row" 
+                spacing={1} 
+                justifyContent="center"
+                flexWrap="wrap"
+                useFlexGap
+                sx={{ '& > *': { m: 0.5 } }}
+              >
+                <Chip 
+                  label="2010s Summer Hits" 
+                  color="primary" 
+                  variant="outlined" 
+                  onClick={() => setDescription("2010s summer hits that were popular at beach parties")}
+                  sx={{ borderRadius: '10px' }}
+                />
+                <Chip 
+                  label="90s R&B Classics" 
+                  color="primary" 
+                  variant="outlined" 
+                  onClick={() => setDescription("Classic 90s R&B songs that defined the era")}
+                  sx={{ borderRadius: '10px' }}
+                />
+                <Chip 
+                  label="Indie Folk for Rainy Days" 
+                  color="primary" 
+                  variant="outlined" 
+                  onClick={() => setDescription("Calming indie folk songs perfect for rainy days with a cup of coffee")}
+                  sx={{ borderRadius: '10px' }}
+                />
+                <Chip 
+                  label="80s Workout Mix" 
+                  color="primary" 
+                  variant="outlined" 
+                  onClick={() => setDescription("Energetic 80s songs for a retro workout session")}
+                  sx={{ borderRadius: '10px' }}
+                />
+                <Chip 
+                  label="2023 Pop Hits" 
+                  color="primary" 
+                  variant="outlined" 
+                  onClick={() => setDescription("Latest pop hits from 2023 that are topping the charts")}
+                  sx={{ borderRadius: '10px' }}
+                />
+              </Stack>
+            </Box>
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                p: { xs: 3, md: 5 }, 
+                borderRadius: '20px',
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.8) 100%)',
+                backdropFilter: 'blur(20px)',
+                mb: 6,
+                position: 'relative',
+                overflow: 'hidden',
+                boxShadow: '0 15px 50px rgba(0,0,0,0.15)'
+              }}
+            >
+              {/* Decorative background elements */}
+              <Box sx={{ 
+                position: 'absolute', 
+                top: 0, 
+                right: 0, 
+                width: '100%', 
+                height: '100%',
+                background: 'radial-gradient(circle at 90% 10%, rgba(29,185,84,0.15) 0%, transparent 50%), radial-gradient(circle at 10% 90%, rgba(30,215,96,0.1) 0%, transparent 50%)',
+                zIndex: 0,
+                borderRadius: '20px'
+              }} />
+              
+              {playlistPreview && (
+                <Box sx={{ position: 'relative', zIndex: 1 }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'flex-start', 
+                    mb: 4, 
+                    flexWrap: 'wrap', 
+                    gap: 2,
+                    flexDirection: { xs: 'column', md: 'row' }
+                  }}>
+                    <Box>
+                      <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                      >
+                        <Typography 
+                          variant="overline" 
+                          sx={{ 
+                            color: theme.palette.primary.main,
+                            fontWeight: 600,
+                            letterSpacing: 1.5
+                          }}
+                        >
+                          YOUR NEW PLAYLIST IS READY
+                        </Typography>
+                        <Typography 
+                          variant="h3" 
+                          fontWeight="bold" 
+                          gutterBottom
+                          sx={{ 
+                            fontSize: { xs: '1.8rem', md: '2.5rem' },
+                            background: 'linear-gradient(90deg, #1DB954 0%, #1ED760 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                          }}
+                        >
+                          {playlistPreview && (playlistPreview as PlaylistPreview).playlist_name.replace('AI Generated: ', '')}
+                        </Typography>
+                        <Typography 
+                          variant="subtitle1" 
+                          color="text.secondary" 
+                          gutterBottom
+                          sx={{ fontWeight: 500 }}
+                        >
+                          Based on: {description}
+                        </Typography>
+                      </motion.div>
+                      
+                      <Box sx={{ 
+                        display: 'flex', 
+                        mt: 3, 
+                        gap: 2,
+                        flexWrap: 'wrap'
+                      }}>
+                        <Button
+                          variant="contained"
+                          href={playlistPreview ? (playlistPreview as PlaylistPreview).playlist_url : '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          startIcon={<SpotifyIcon />}
+                          sx={{ 
+                            borderRadius: '12px',
+                            boxShadow: '0 8px 20px rgba(29,185,84,0.3)',
+                            background: 'linear-gradient(90deg, #1DB954 0%, #1ED760 100%)',
+                          }}
+                        >
+                          Open in Spotify
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          startIcon={<ReplayIcon />}
+                          onClick={handleNewPlaylist}
+                          sx={{ borderRadius: '12px' }}
+                        >
+                          Create New Playlist
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          startIcon={<BookmarkBorderIcon />}
+                          onClick={() => handleSavePrompt(description)}
+                          sx={{ display: { xs: 'none', sm: 'flex' }, borderRadius: '12px' }}
+                        >
+                          Save Prompt
+                        </Button>
+                      </Box>
+                    </Box>
+                    
+                    <Box sx={{ 
+                      display: 'flex', 
+                      gap: 1,
+                      alignSelf: { xs: 'flex-start', md: 'center' }
+                    }}>
+                      <Tooltip title="Share Playlist">
+                        <IconButton 
+                          color="primary" 
+                          size="large"
+                          sx={{ 
+                            bgcolor: alpha(theme.palette.primary.main, 0.1),
+                            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
+                            borderRadius: '12px'
+                          }}
+                        >
+                          <ShareIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="More Options">
+                        <IconButton 
+                          color="primary" 
+                          size="large"
+                          onClick={handleMenuOpen}
+                          sx={{ 
+                            bgcolor: alpha(theme.palette.primary.main, 0.1),
+                            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
+                            borderRadius: '12px'
+                          }}
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+                  
+                  <Divider sx={{ my: 3 }} />
+                  
+                  <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <AudiotrackIcon color="primary" /> 
+                    <span>Playlist Songs</span>
+                    <Badge 
+                      badgeContent={playlistPreview ? (playlistPreview as PlaylistPreview).tracks.length : 0} 
+                      color="primary"
+                      sx={{ 
+                        '& .MuiBadge-badge': { 
+                          fontSize: '0.8rem', 
+                          height: '22px', 
+                          minWidth: '22px',
+                          borderRadius: '11px'
+                        } 
+                      }}
+                    />
+                  </Typography>
+                  
+                  <Grid container spacing={2} sx={{ mt: 1 }}>
+                    {playlistPreview && (playlistPreview as PlaylistPreview).tracks.map((track: Track, index: number) => (
+                      <Grid 
+                        key={index}
+                        size={{ xs: 12, sm: 6, md: 4, lg: 3 }}
+                      >
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: index * 0.03 }}
+                        >
+                          <Card 
+                            sx={{ 
+                              height: '100%', 
+                              display: 'flex', 
+                              flexDirection: 'column',
+                              position: 'relative',
+                              overflow: 'hidden',
+                              transition: 'all 0.3s ease',
+                              borderRadius: '16px',
+                              boxShadow: '0 4px 15px rgba(0,0,0,0.07)',
+                              '&:hover': {
+                                transform: 'translateY(-8px)',
+                                boxShadow: (theme) => `0 12px 28px ${alpha(theme.palette.common.black, 0.15)}`
+                              }
+                            }}
+                            onMouseEnter={() => setHoverTrack(index)}
+                            onMouseLeave={() => setHoverTrack(null)}
+                          >
+                            <Box sx={{ position: 'relative' }}>
+                              <CardMedia
+                                component="img"
+                                height="160"
+                                image={track.album_image || 'https://via.placeholder.com/160?text=Album+Cover'}
+                                alt={track.name}
+                                sx={{ objectFit: 'cover' }}
+                              />
+                              {hoverTrack === index && (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ duration: 0.2 }}
+                                >
+                                  <Box
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 8,
+                                      right: 8,
+                                      bgcolor: 'rgba(0,0,0,0.6)',
+                                      borderRadius: '50%',
+                                    }}
+                                  >
+                                    <IconButton
+                                      size="small"
+                                      sx={{ color: 'white' }}
+                                    >
+                                      <MoreVertIcon fontSize="small" />
+                                    </IconButton>
+                                  </Box>
+                                </motion.div>
+                              )}
+                            </Box>
+                            <CardContent sx={{ flexGrow: 1, pb: 1 }}>
+                              <Typography variant="subtitle1" component="div" noWrap title={track.name} fontWeight="medium">
+                                {track.name}
+                              </Typography>
+                              <Typography 
+                                variant="body2" 
+                                color="text.secondary"
+                                sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: 0.5 
+                                }}
+                              >
+                                <Avatar sx={{ width: 20, height: 20, bgcolor: 'primary.main' }}>
+                                  <AlbumIcon sx={{ fontSize: 12 }} />
+                                </Avatar>
+                                {track.artist}
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
             </Paper>
           </motion.div>
         )}
@@ -1358,7 +1463,8 @@ const GeneratePlaylist: React.FC = () => {
             onClose={() => setShowSuccess(false)}
             sx={{ 
               boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
-              '& .MuiAlert-icon': { fontSize: 20 } 
+              '& .MuiAlert-icon': { fontSize: 20 },
+              borderRadius: '12px'
             }}
           >
             {playlistPreview ? 'Link copied to clipboard!' : 'Playlist generated successfully!'}
@@ -1370,47 +1476,105 @@ const GeneratePlaylist: React.FC = () => {
       <Box
         component="footer"
         sx={{
-          py: 3,
+          py: 4,
           px: 2,
           mt: 'auto',
           backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.8),
           backdropFilter: 'blur(10px)',
           borderTop: '1px solid',
-          borderColor: 'divider',
-          textAlign: 'center'
+          borderTopColor: 'divider',
+          textAlign: 'center',
+          position: 'relative',
+          overflow: 'hidden'
         }}
       >
-        <Typography variant="body2" color="text.secondary">
-          Made with <FavoriteIcon sx={{ fontSize: 16, verticalAlign: 'text-bottom', color: '#ff5c8d' }} /> by{' '}
-          <Link 
-            href="https://silin.ca" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            sx={{ 
-              color: 'primary.main',
-              textDecoration: 'none',
-              position: 'relative',
-              '&:hover': {
-                textDecoration: 'none',
-                '&::after': {
-                  width: '100%'
-                }
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                bottom: -2,
-                left: 0,
-                width: 0,
-                height: 1,
-                bgcolor: 'primary.main',
-                transition: 'width 0.3s ease'
-              }
-            }}
+        {/* Decorative wave background */}
+        <Box 
+          sx={{ 
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%231DB954' fill-opacity='0.05' d='M0,32L48,58.7C96,85,192,139,288,154.7C384,171,480,149,576,144C672,139,768,149,864,170.7C960,192,1056,224,1152,218.7C1248,213,1344,171,1392,149.3L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E")`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            zIndex: 0,
+            pointerEvents: 'none'
+          }}
+        />
+        
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
           >
-            silin.ca
-          </Link>
-        </Typography>
+            <Typography 
+              variant="body1" 
+              color="text.secondary"
+              sx={{ 
+                fontSize: { xs: '0.9rem', md: '1rem' },
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1
+              }}
+            >
+              Made with{' '}
+              <motion.div
+                animate={{ 
+                  scale: [1, 1.3, 1],
+                }}
+                transition={{ 
+                  duration: 1,
+                  repeat: Infinity,
+                  repeatType: 'loop',
+                  repeatDelay: 1.5
+                }}
+              >
+                <FavoriteIcon 
+                  sx={{ 
+                    fontSize: 18, 
+                    color: '#ff5c8d',
+                    verticalAlign: 'text-bottom',
+                  }} 
+                />
+              </motion.div>
+              {' '}by{' '}
+              <Link 
+                href="https://silin.ca" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                sx={{ 
+                  color: theme.palette.primary.main,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  position: 'relative',
+                  '&:hover': {
+                    textDecoration: 'none',
+                    '&::after': {
+                      width: '100%'
+                    }
+                  },
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    bottom: -2,
+                    left: 0,
+                    width: 0,
+                    height: 2,
+                    bgcolor: theme.palette.primary.main,
+                    transition: 'width 0.3s ease'
+                  }
+                }}
+              >
+                silin.ca
+              </Link>
+            </Typography>
+          </motion.div>
+        </Box>
       </Box>
     </>
   )

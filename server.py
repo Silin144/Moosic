@@ -14,6 +14,8 @@ import requests
 import secrets
 import urllib.parse
 import re
+from fuzzywuzzy import fuzz
+from openai import OpenAI
 
 # Load environment variables
 load_dotenv()
@@ -126,6 +128,9 @@ sp_oauth = SpotifyOAuth(
     state='moosic_state',  # Add state parameter for security
     show_dialog=True  # Force user to approve the app each time
 )
+
+# Initialize OpenAI client
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 def get_spotify_client():
     """Get a Spotify client with a valid token"""
@@ -735,7 +740,7 @@ def generate_playlist():
 5. Identify any specific artist influences mentioned
 
 ## THEN, GENERATE SONG SELECTIONS:
-Based on your analysis, provide 25 highly relevant songs that precisely match the request. Focus on quality, variety, and accuracy.
+Based on your analysis, provide EXACTLY 25 highly relevant songs that precisely match the request. Focus on quality, variety, and accuracy.
 Prioritize well-known, mainstream songs that are likely available on Spotify.
 """
             
@@ -761,6 +766,7 @@ Prioritize well-known, mainstream songs that are likely available on Spotify.
 6. Ensure genre accuracy - don't include pop songs when rock is requested
 7. Format each song as: "Song Title by Artist Name"
 8. NEVER provide commentary or explanations with the songs
+9. ALWAYS provide EXACTLY 25 songs - no more, no less
 """
                     },
                     {
@@ -1245,6 +1251,167 @@ def retry_with_backoff(func, max_retries=3, initial_delay=1):
                 delay *= 2
     
     raise last_exception
+
+def search_spotify_track(song_details, sp):
+    """
+    Search for a song on Spotify and return the best matching track ID.
+    
+    Args:
+        song_details (str): String in format "Song Title by Artist Name"
+        sp: Spotify client
+        
+    Returns:
+        dict: Track info with name, artist, id, etc. or None if not found
+    """
+    try:
+        # Parse song details
+        parts = song_details.split(' by ', 1)
+        if len(parts) != 2:
+            logger.warning(f"Couldn't parse song details: {song_details}")
+            return None
+            
+        song_name, artist_name = parts
+        song_name = song_name.strip()
+        artist_name = artist_name.strip()
+        
+        # Try exact search first with both title and artist
+        query = f"track:{song_name} artist:{artist_name}"
+        results = sp.search(q=query, type='track', limit=5)
+        
+        if results['tracks']['items']:
+            track = results['tracks']['items'][0]
+            logger.info(f"Found track: {track['name']} by {track['artists'][0]['name']} with ID: {track['id']}")
+            return {
+                'id': track['id'],
+                'name': track['name'],
+                'artist': track['artists'][0]['name'],
+                'album': track['album']['name'],
+                'image_url': track['album']['images'][0]['url'] if track['album']['images'] else None,
+                'preview_url': track['preview_url'],
+                'artist_id': track['artists'][0]['id'] if track['artists'] else None
+            }
+        
+        # If exact search fails, try a less restrictive search
+        query = f"{song_name} {artist_name}"
+        results = sp.search(q=query, type='track', limit=10)
+        
+        if not results['tracks']['items']:
+            logger.warning(f"No results found for: {song_details}")
+            return None
+            
+        # Find the best match by comparing artist names
+        best_match = None
+        for track in results['tracks']['items']:
+            track_artist = track['artists'][0]['name'].lower()
+            
+            # Check if the artist names are similar
+            if (track_artist in artist_name.lower() or 
+                artist_name.lower() in track_artist or
+                fuzz.ratio(track_artist, artist_name.lower()) > 70):
+                
+                # Get the first match
+                if not best_match:
+                    best_match = track
+                    break
+        
+        # If no artist match, just take the first result
+        if not best_match and results['tracks']['items']:
+            best_match = results['tracks']['items'][0]
+            
+        if best_match:
+            logger.info(f"Found best match: {best_match['name']} by {best_match['artists'][0]['name']} with ID: {best_match['id']}")
+            return {
+                'id': best_match['id'],
+                'name': best_match['name'],
+                'artist': best_match['artists'][0]['name'],
+                'album': best_match['album']['name'],
+                'image_url': best_match['album']['images'][0]['url'] if best_match['album']['images'] else None,
+                'preview_url': best_match['preview_url'],
+                'artist_id': best_match['artists'][0]['id'] if best_match['artists'] else None
+            }
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error searching for track {song_details}: {str(e)}")
+        logger.exception(e)
+        return None
+
+def generate_song_suggestions(
+    prompt, 
+    seed_artists=None,
+    seed_genres=None, 
+    seed_tracks=None,
+    analysis=None
+):
+    """Generate song suggestions using OpenAI"""
+    try:
+        logger.info(f"Generating song suggestions for prompt: {prompt}")
+        
+        # Format seed information
+        artists_text = f"Some artists you might consider: {', '.join(seed_artists)}. " if seed_artists else ""
+        genres_text = f"Some genres to consider: {', '.join(seed_genres)}. " if seed_genres else ""
+        tracks_text = f"Some tracks to consider: {', '.join(seed_tracks)}. " if seed_tracks else ""
+        
+        # Add personality analysis if available
+        personality_text = ""
+        if analysis and isinstance(analysis, dict):
+            traits = []
+            for category, score in analysis.items():
+                if score > 0.7:  # High score
+                    traits.append(f"high {category}")
+                elif score < 0.3:  # Low score
+                    traits.append(f"low {category}")
+            
+            if traits:
+                personality_text = f"Consider that the user's personality analysis shows: {', '.join(traits)}. "
+            
+        # Create a detailed system prompt
+        system_prompt = """
+        You are a music expert with vast knowledge of songs across all genres and time periods.
+        You will suggest specific songs based on the user's request.
+        For each song, provide the song name and the artist name, formatted consistently as: "Song Name by Artist Name".
+        Do not include any explanations, numbering, or additional details - just the list of songs in the specified format.
+        Suggest songs that genuinely match the user's request, without making up songs that don't exist.
+        """
+        
+        # Create the user prompt
+        user_prompt = f"""
+        I need you to create a playlist with at least 75 songs based on this request: "{prompt}".
+        {artists_text}
+        {genres_text}
+        {tracks_text}
+        {personality_text}
+        Do not include any explanations - only respond with a list of real songs in the format "Song Name by Artist Name", one per line.
+        """
+        
+        logger.info(f"Sending prompt to OpenAI: {user_prompt[:100]}...")
+        
+        # Call OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-4-turbo-preview",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2000
+        )
+        
+        # Parse the response
+        content = response.choices[0].message.content.strip()
+        logger.info(f"Received response from OpenAI: {len(content)} characters")
+        
+        # Split the response into individual songs
+        songs = [song.strip() for song in content.split('\n') if song.strip()]
+        logger.info(f"Extracted {len(songs)} songs from OpenAI response")
+        
+        return songs
+        
+    except Exception as e:
+        logger.error(f"Error generating song suggestions: {str(e)}")
+        logger.exception(e)
+        return None
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 10000))
