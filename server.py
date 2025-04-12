@@ -84,7 +84,7 @@ Session(app)
 
 # Configure CORS
 CORS(app, 
-     origins=[os.environ['FRONTEND_URL']], 
+     origins="*", 
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization", "Accept"],
      methods=["GET", "POST", "OPTIONS"],
@@ -94,14 +94,13 @@ CORS(app,
 @app.after_request
 def after_request(response):
     origin = request.headers.get('Origin', '')
-    # Only apply CORS headers to requests from our frontend
-    if origin == os.environ['FRONTEND_URL']:
-        response.headers.add('Access-Control-Allow-Origin', origin)
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie')
-        response.headers.add('Access-Control-Max-Age', '3600')
+    # Apply CORS headers to all origins during debugging
+    response.headers.add('Access-Control-Allow-Origin', origin)
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Access-Control-Expose-Headers', 'Set-Cookie')
+    response.headers.add('Access-Control-Max-Age', '3600')
     
     # Log response cookies for debugging
     if 'Set-Cookie' in response.headers:
@@ -387,6 +386,9 @@ def check_auth():
         logger.info(f"Checking auth, session keys: {list(session.keys())}")
         logger.info(f"Session cookie name: {app.config['SESSION_COOKIE_NAME']}")
         logger.info(f"Session ID: {session.sid if hasattr(session, 'sid') else 'No session ID'}")
+        logger.info(f"Request cookies: {request.cookies}")
+        logger.info(f"Request origin: {request.headers.get('Origin', 'No origin')}")
+        logger.info(f"Request headers: {dict(request.headers)}")
         
         # First, check if we have the authenticated flag and user data
         if 'authenticated' in session and 'user' in session and 'token_info' in session:
