@@ -772,7 +772,7 @@ Prioritize well-known, mainstream songs that are likely available on Spotify.
             
             # Call OpenAI API - handle both old and new API versions
             response = openai.ChatCompletion.create(
-                model="gpt-4-turbo-preview",
+                model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": prompt_analysis},
                     {"role": "user", "content": user_prompt}
@@ -1385,11 +1385,9 @@ def generate_song_suggestions(
             
         # Create a detailed system prompt
         system_prompt = """
-        You are a music expert with vast knowledge of songs across all genres and time periods.
-        You will suggest specific songs based on the user's request.
-        For each song, provide the song name and the artist name, formatted consistently as: "Song Name by Artist Name".
-        Do not include any explanations, numbering, or additional details - just the list of songs in the specified format.
-        Suggest songs that genuinely match the user's request, without making up songs that don't exist.
+        You are a music expert. Return a list of 25 songs matching the user's request.
+        Format each song as: "Song Name by Artist Name"
+        Only include real songs. No explanations or additional text.
         """
         
         # Create the user prompt
@@ -1406,7 +1404,7 @@ def generate_song_suggestions(
         
         # Call OpenAI API - handle both old and new API versions
         response = openai.ChatCompletion.create(
-            model="gpt-4-turbo-preview",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
