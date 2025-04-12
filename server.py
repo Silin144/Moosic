@@ -740,6 +740,11 @@ def generate_playlist():
 3. Identify mood/vibe descriptors (e.g., "chill", "upbeat", "melancholic")
 4. Note any activity contexts (e.g., "workout", "studying", "road trip")
 5. Identify any specific artist influences mentioned
+6. Check if the request mentions specific songs to use as references (e.g., "songs like Shape of You")
+
+## RESPONSE STRATEGY:
+- If the request mentions "songs like [song title]", focus on providing songs with similar style, tempo, mood, and from similar artists or genres.
+- For any reference songs mentioned, try to identify their key characteristics (genre, mood, era) and use those to guide your selections.
 
 ## THEN, GENERATE SONG SELECTIONS:
 Based on your analysis, provide EXACTLY 25 highly relevant songs that precisely match the request. Focus on quality, variety, and accuracy.
@@ -755,7 +760,7 @@ Prioritize well-known, mainstream songs that are likely available on Spotify.
                 personality_text = f"{personalization}\n\n"
             
             user_prompt = f"""
-            I need you to create a playlist with at least 75 songs based on this request: "{playlist_description}".
+            I need you to create a playlist with at least 25 songs based on this request: "{playlist_description}".
             {artists_text}
             {genres_text}
             {tracks_text}
@@ -873,6 +878,54 @@ Prioritize well-known, mainstream songs that are likely available on Spotify.
         # Extract mood, genres and era from playlist description for better recommendations
         description_lower = playlist_description.lower()
         
+        # Check if the user is asking for songs similar to a specific song
+        similar_song_patterns = [
+            r'songs? like (.+)',
+            r'similar to (.+)',
+            r'tracks? like (.+)',
+            r'music like (.+)',
+            r'vibes? like (.+)'
+        ]
+        
+        specific_seed_tracks = []
+        for pattern in similar_song_patterns:
+            matches = re.findall(pattern, description_lower)
+            if matches:
+                for match in matches:
+                    # Clean up the extracted song title
+                    song_title = match.strip()
+                    # Remove trailing "by" if present
+                    if " by " in song_title:
+                        song_title = song_title.split(" by ")[0].strip()
+                    
+                    logger.info(f"Detected reference to specific song: '{song_title}'")
+                    
+                    # Search for this song on Spotify
+                    try:
+                        search_results = sp.search(q=song_title, type='track', limit=1)
+                        if search_results['tracks']['items']:
+                            track = search_results['tracks']['items'][0]
+                            specific_seed_tracks.append({
+                                'id': track['id'],
+                                'name': track['name'],
+                                'artist': track['artists'][0]['name'],
+                                'uri': track['uri']
+                            })
+                            logger.info(f"Found seed track: {track['name']} by {track['artists'][0]['name']}")
+                            
+                            # Add this first match to our tracks if we don't have any yet
+                            if not tracks and track['uri'] not in track_uris:
+                                track_artist = track['artists'][0]['name'].lower()
+                                added_artists.add(track_artist)
+                                track_uris.append(track['uri'])
+                                tracks.append({
+                                    'name': track['name'],
+                                    'artist': track['artists'][0]['name'],
+                                    'album_image': track['album']['images'][0]['url'] if track['album']['images'] else None
+                                })
+                    except Exception as e:
+                        logger.warning(f"Error searching for seed track '{song_title}': {str(e)}")
+        
         # Detect mood from description
         mood_mapping = {
             'happy': {'valence': 0.8, 'energy': 0.7},
@@ -942,7 +995,13 @@ Prioritize well-known, mainstream songs that are likely available on Spotify.
             logger.info(f"Need {remaining_slots} more tracks to reach 50 total")
             
             # Prepare seed data for recommendations
-            seed_tracks = track_uris[:2] if track_uris else top_track_ids[:2]
+            # Prioritize specific seed tracks if we found any from the user's request
+            if specific_seed_tracks:
+                seed_tracks = [track['id'] for track in specific_seed_tracks]
+                logger.info(f"Using specific requested tracks as seeds: {', '.join([t['name'] for t in specific_seed_tracks])}")
+            else:
+                seed_tracks = track_uris[:2] if track_uris else top_track_ids[:2]
+                
             seed_artists = top_artist_ids[:2] if top_artist_ids else []
             seed_genres = detected_genres[:1] if detected_genres else top_artist_genres[:1] if top_artist_genres else []
             
@@ -1335,7 +1394,7 @@ def generate_song_suggestions(
         
         # Create the user prompt
         user_prompt = f"""
-        I need you to create a playlist with at least 75 songs based on this request: "{prompt}".
+        I need you to create a playlist with at least 25 songs based on this request: "{prompt}".
         {artists_text}
         {genres_text}
         {tracks_text}
