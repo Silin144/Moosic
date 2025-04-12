@@ -15,7 +15,11 @@ import secrets
 import urllib.parse
 import re
 from fuzzywuzzy import fuzz
-from openai import OpenAI
+try:
+    from openai import OpenAI
+    USE_NEW_CLIENT = True
+except ImportError:
+    USE_NEW_CLIENT = False
 
 # Load environment variables
 load_dotenv()
@@ -129,8 +133,12 @@ sp_oauth = SpotifyOAuth(
     show_dialog=True  # Force user to approve the app each time
 )
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+# Configure OpenAI API key
+openai.api_key = os.getenv('OPENAI_API_KEY')
+
+# Initialize OpenAI client (for newer versions)
+if USE_NEW_CLIENT:
+    client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 def get_spotify_client():
     """Get a Spotify client with a valid token"""
@@ -511,12 +519,14 @@ def create_playlist():
 
         # Get song suggestions from GPT
         openai.api_key = os.getenv('OPENAI_API_KEY')
-        completion = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """You are a professional music curator with extensive knowledge of music history, chart hits, and cultural trends across different time periods.
+        if USE_NEW_CLIENT:
+            # New OpenAI client version
+            completion = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are a professional music curator with extensive knowledge of music history, chart hits, and cultural trends across different time periods.
 
 Your task is to suggest 10 specific songs (with artists) that perfectly match the requested mood and genres.
 
@@ -531,16 +541,48 @@ Follow these guidelines:
 8. Format the response as JSON with fields:
    - songSuggestions (array of {title, artist})
    - description (string explaining why these songs fit the request and how they connect to any specified time period)"""
-                },
-                {
-                    "role": "user",
-                    "content": f"Suggest songs for a {mood} playlist with these genres: {', '.join(genres)}"
-                }
-            ],
-            temperature=0.7
-        )
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Suggest songs for a {mood} playlist with these genres: {', '.join(genres)}"
+                    }
+                ],
+                temperature=0.7
+            )
+            suggestions_content = completion.choices[0].message.content
+        else:
+            # Old OpenAI version
+            completion = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are a professional music curator with extensive knowledge of music history, chart hits, and cultural trends across different time periods.
+
+Your task is to suggest 10 specific songs (with artists) that perfectly match the requested mood and genres.
+
+Follow these guidelines:
+1. For year or era-specific requests (e.g., '2016 vibes', '90s rock'), prioritize actual popular/charting songs from that time period.
+2. Suggest only original songs, NO parodies, karaoke, covers, tributes, or remixes unless specifically requested.
+3. Include well-known, high-quality songs that match the requested mood and genres.
+4. Prioritize songs that were commercially successful or critically acclaimed.
+5. Never include novelty songs, joke songs, or parodies unless explicitly requested.
+6. When given a year or decade, focus on songs that were actually popular or influential during that time.
+7. Ensure all suggestions are legitimate songs by real artists, not fabricated.
+8. Format the response as JSON with fields:
+   - songSuggestions (array of {title, artist})
+   - description (string explaining why these songs fit the request and how they connect to any specified time period)"""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Suggest songs for a {mood} playlist with these genres: {', '.join(genres)}"
+                    }
+                ],
+                temperature=0.7
+            )
+            suggestions_content = completion.choices[0].message['content']
         
-        suggestions = json.loads(completion.choices[0].message['content'])
+        suggestions = json.loads(suggestions_content)
         logger.info('Got song suggestions')
         logger.debug(f'Suggestions: {suggestions}')
 
@@ -712,7 +754,7 @@ def generate_playlist():
             top_artist_ids = []
             top_track_ids = []
         
-        # Generate song suggestions using OpenAI - ask for MORE songs (25 instead of 15-20)
+        # Generate song suggestions using OpenAI
         try:
             openai.api_key = os.getenv('OPENAI_API_KEY')
             
@@ -744,12 +786,14 @@ Based on your analysis, provide EXACTLY 25 highly relevant songs that precisely 
 Prioritize well-known, mainstream songs that are likely available on Spotify.
 """
             
-            completion = openai.ChatCompletion.create(
-                model="gpt-4o",  # Using GPT-4o for superior music knowledge and taste
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You are an elite music curator with encyclopedic knowledge of music across all eras, genres, and cultures. Your recommendations are always authentic, accurate, and perfectly tailored to the request.
+            if USE_NEW_CLIENT:
+                # New OpenAI client version
+                completion = client.chat.completions.create(
+                    model="gpt-4o",  # Using GPT-4o for superior music knowledge and taste
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": """You are an elite music curator with encyclopedic knowledge of music across all eras, genres, and cultures. Your recommendations are always authentic, accurate, and perfectly tailored to the request.
 
 ## YOUR CAPABILITIES:
 - Deep understanding of music history, styles, scenes, and cultural significance
@@ -768,16 +812,52 @@ Prioritize well-known, mainstream songs that are likely available on Spotify.
 8. NEVER provide commentary or explanations with the songs
 9. ALWAYS provide EXACTLY 25 songs - no more, no less
 """
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt_analysis
-                    }
-                ],
-                temperature=0.7
-            )
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt_analysis
+                        }
+                    ],
+                    temperature=0.7
+                )
+                raw_song_list = completion.choices[0].message.content.strip().split('\n')
+            else:
+                # Old OpenAI version
+                completion = openai.ChatCompletion.create(
+                    model="gpt-4o",  # Using GPT-4o for superior music knowledge and taste
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": """You are an elite music curator with encyclopedic knowledge of music across all eras, genres, and cultures. Your recommendations are always authentic, accurate, and perfectly tailored to the request.
+
+## YOUR CAPABILITIES:
+- Deep understanding of music history, styles, scenes, and cultural significance
+- Extensive knowledge of chart hits and underground classics from all decades
+- Ability to match songs precisely to moods, activities, and specific requests
+- Recognition of subtle distinctions between subgenres and music movements
+
+## STRICT RULES:
+1. NEVER suggest karaoke, covers, remixes, or tributes - ONLY original studio recordings
+2. For year-specific requests (e.g., "2016 hits"), ONLY include songs that were actually released or popular in that EXACT timeframe
+3. For decade requests (e.g., "90s rock"), choose defining songs that genuinely represent that era's sound
+4. Never include more than one song by the same artist
+5. ONLY include real, streamable songs (no made-up tracks)
+6. Ensure genre accuracy - don't include pop songs when rock is requested
+7. Format each song as: "Song Title by Artist Name"
+8. NEVER provide commentary or explanations with the songs
+9. ALWAYS provide EXACTLY 25 songs - no more, no less
+"""
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt_analysis
+                        }
+                    ],
+                    temperature=0.7
+                )
+                raw_song_list = completion.choices[0].message['content'].strip().split('\n')
             
-            raw_song_list = completion.choices[0].message['content'].strip().split('\n')
+            logger.info(f"Parsed {len(raw_song_list)} songs from OpenAI response")
             
             # Better parsing of the GPT output to handle inconsistent formats
             cleaned_songs = []
@@ -820,11 +900,11 @@ Prioritize well-known, mainstream songs that are likely available on Spotify.
                             artist_name = split_line[1].strip().strip('"\'')
                             cleaned_songs.append(f"{song_name} by {artist_name}")
             
-            logger.info(f"Parsed {len(cleaned_songs)} songs from AI response")
+            logger.info(f"Parsed {len(cleaned_songs)} songs from OpenAI response")
             
             # If we still don't have enough songs, log an error but continue with what we have
             if len(cleaned_songs) < 10:
-                logger.error(f"Failed to parse enough songs from AI response: {raw_song_list}")
+                logger.error(f"Failed to parse enough songs from OpenAI response: {raw_song_list}")
             
         except Exception as e:
             logger.error(f"Error in OpenAI API call: {str(e)}")
@@ -874,7 +954,7 @@ Prioritize well-known, mainstream songs that are likely available on Spotify.
                         return True
             return False
         
-        # Process songs from AI suggestions
+        # Process songs from OpenAI suggestions
         if cleaned_songs:
             for song in cleaned_songs:
                 # Skip if we already have enough tracks
@@ -907,10 +987,10 @@ Prioritize well-known, mainstream songs that are likely available on Spotify.
                         
         # Log what we found so far
         if tracks:
-            logger.info(f"Successfully found {len(tracks)} tracks from AI suggestions")
+            logger.info(f"Successfully found {len(tracks)} tracks from OpenAI suggestions")
             logger.info("First few tracks: " + ", ".join([f"{t['name']} by {t['artist']}" for t in tracks[:3]]))
         else:
-            logger.warning("No tracks found from AI suggestions")
+            logger.warning("No tracks found from OpenAI suggestions")
             
         # Extract mood, genres and era from playlist description for better recommendations
         description_lower = playlist_description.lower()
@@ -1387,19 +1467,34 @@ def generate_song_suggestions(
         
         logger.info(f"Sending prompt to OpenAI: {user_prompt[:100]}...")
         
-        # Call OpenAI API
-        response = client.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.7,
-            max_tokens=2000
-        )
+        # Call OpenAI API - handle both old and new API versions
+        if USE_NEW_CLIENT:
+            # New OpenAI client version
+            response = client.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=2000
+            )
+            # Parse the response
+            content = response.choices[0].message.content.strip()
+        else:
+            # Old OpenAI version
+            response = openai.ChatCompletion.create(
+                model="gpt-4-turbo-preview",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=2000
+            )
+            # Parse the response
+            content = response.choices[0].message['content'].strip()
         
-        # Parse the response
-        content = response.choices[0].message.content.strip()
         logger.info(f"Received response from OpenAI: {len(content)} characters")
         
         # Split the response into individual songs
