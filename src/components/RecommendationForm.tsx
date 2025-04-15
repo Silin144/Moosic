@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { RecommendationEngine } from '../lib/recommendationEngine';
 import { Track } from '../types/spotify';
+import { RecommendationEngine } from '../lib/recommendationEngine';
 
 interface RecommendationFormProps {
   spotifyApi: any;
